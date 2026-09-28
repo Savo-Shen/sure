@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -437,11 +437,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_120000) do
   create_table "chats", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "error"
+    t.uuid "family_id", null: false
     t.string "instructions"
     t.string "latest_assistant_response_id"
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
+    t.index ["family_id"], name: "index_chats_on_family_id"
     t.index ["user_id"], name: "index_chats_on_user_id"
   end
 
@@ -2957,6 +2959,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_120000) do
   add_foreign_key "categories", "families"
   add_foreign_key "categorization_comparisons", "families"
   add_foreign_key "categorization_comparisons", "transactions", on_delete: :nullify
+  add_foreign_key "chats", "families"
   add_foreign_key "chats", "users"
   add_foreign_key "coinbase_accounts", "coinbase_items"
   add_foreign_key "coinbase_items", "families"

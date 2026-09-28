@@ -321,12 +321,12 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "for_chat returns External when family assistant_type is external" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assert_instance_of Assistant::External, Assistant.for_chat(@chat)
   end
 
   test "ASSISTANT_TYPE env override forces external regardless of DB value" do
-    assert_equal "builtin", @chat.user.family.assistant_type
+    assert_equal "builtin", @chat.family.assistant_type
 
     with_env_overrides("ASSISTANT_TYPE" => "external") do
       assert_instance_of Assistant::External, Assistant.for_chat(@chat)
@@ -336,7 +336,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant responds with streamed text" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     sse_body = <<~SSE
@@ -368,7 +368,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant adds error when not configured" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     with_env_overrides(
@@ -396,7 +396,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant adds error on connection failure" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     Net::HTTP.any_instance.stubs(:request).raises(Errno::ECONNREFUSED, "Connection refused")
@@ -416,7 +416,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant handles empty response gracefully" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     sse_body = <<~SSE
@@ -446,7 +446,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant sends conversation history" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     AssistantMessage.create!(chat: @chat, content: "I can help with that.", ai_model: "external")
@@ -470,7 +470,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "full external assistant flow: config check, stream, save, error recovery" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
 
     # Phase 1: Without config, errors gracefully
     with_env_overrides("EXTERNAL_ASSISTANT_URL" => nil, "EXTERNAL_ASSISTANT_TOKEN" => nil, "EXTERNAL_ASSISTANT_MODEL" => nil) do
@@ -523,7 +523,7 @@ class AssistantTest < ActiveSupport::TestCase
   end
 
   test "external assistant sets user identifier with family_id" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     sse_body = "data: {\"choices\":[{\"delta\":{\"content\":\"OK\"}}],\"model\":\"m\"}\n\ndata: [DONE]\n\n"
@@ -537,12 +537,12 @@ class AssistantTest < ActiveSupport::TestCase
       assistant.respond_to(@message)
 
       body = JSON.parse(capture[0].body)
-      assert_equal "sure-family-#{@chat.user.family_id}", body["user"]
+      assert_equal "sure-family-#{@chat.family_id}", body["user"]
     end
   end
 
   test "external assistant updates ai_model from SSE response model field" do
-    @chat.user.family.update!(assistant_type: "external")
+    @chat.family.update!(assistant_type: "external")
     assistant = Assistant.for_chat(@chat)
 
     sse_body = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}],\"model\":\"ext-agent:custom\"}\n\ndata: [DONE]\n\n"

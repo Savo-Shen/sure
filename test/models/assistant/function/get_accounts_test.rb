@@ -84,4 +84,14 @@ class Assistant::Function::GetAccountsTest < ActiveSupport::TestCase
     assert_not future_payload.key?(:historical_balances)
     assert(result[:accounts].any? { |a| a.key?(:historical_balances) })
   end
+
+  test "lists only the given ledger's accounts" do
+    ledger_b = families(:empty)
+    FamilyMembership.create!(user: @user, family: ledger_b, role: "owner")
+    ledger_b.accounts.create!(name: "Ledger B Savings", balance: 10, currency: "USD", accountable: Depository.new, owner: @user)
+
+    names = Assistant::Function::GetAccounts.new(@user, family: ledger_b).call[:accounts].map { |account| account[:name] }
+
+    assert_equal [ "Ledger B Savings" ], names
+  end
 end

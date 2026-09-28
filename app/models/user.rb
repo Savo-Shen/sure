@@ -185,7 +185,13 @@ class User < ApplicationRecord
   end
 
   def accessible_accounts
-    family.accounts.accessible_by(self)
+    active_family.accounts.accessible_by(self)
+  end
+
+  # The ledger this user is working in: the switched-to ledger while they are
+  # the request's user, otherwise (jobs, other users) their primary family.
+  def active_family
+    (Current.user == self && Current.family) || family
   end
 
   # Returns the membership record linking this user to +family+, or nil when
@@ -206,7 +212,7 @@ class User < ApplicationRecord
   end
 
   def finance_accounts
-    family.accounts.included_in_finances_for(self)
+    active_family.accounts.included_in_finances_for(self)
   end
 
   # Other family members who have granted this user access to their personal
@@ -515,6 +521,8 @@ class User < ApplicationRecord
   end
 
   def purge
+    destroy_sole_member_secondary_ledgers!
+
     if last_user_in_family?
       family.destroy
       # Family#destroy re-homes members who still belong to another ledger
@@ -608,7 +616,6 @@ class User < ApplicationRecord
     return nil unless default_account_id.present?
 
     account = default_account
-    active_family = Current.user == self ? Current.family : family
     return nil unless account&.eligible_for_transaction_default? && account.family_id == active_family&.id
 
     account
@@ -855,6 +862,15 @@ class User < ApplicationRecord
 
     def last_user_in_family?
       !family.family_memberships.where.not(user_id: id).exists?
+    end
+
+    # Secondary ledgers nobody else belongs to would be orphaned once this
+    # user's memberships go away.
+    def destroy_sole_member_secondary_ledgers!
+      Family.where(id: family_memberships.where.not(family_id: family_id).select(:family_id))
+            .where.not(id: FamilyMembership.where.not(user_id: id).select(:family_id))
+            .find_each(&:destroy)
+      family_memberships.reset
     end
 
     # Owned accounts can live in any ledger the user belongs to; each one goes

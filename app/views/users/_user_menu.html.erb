@@ -62,6 +62,22 @@
       <% end %>
       <%= render DS::MenuItem.new(variant: "link", roving: false, text: t(".contact"), icon: "message-square-more", href: "https://discord.gg/36ZGBsxYEK", target: "_blank", rel: "noopener noreferrer") %>
 
+      <%# Intro layout has no account sidebar, so the ledger switcher lives here. %>
+      <% ledgers = intro_mode ? user.families.order(:name).to_a : [] %>
+      <% if ledgers.size > 1 %>
+        <%= render DS::MenuItem.new(variant: "divider") %>
+        <% ledgers.each do |ledger| %>
+          <%= render DS::MenuItem.new(
+            variant: "button",
+            roving: false,
+            text: ledger.name.presence || t("families.switcher.unnamed_ledger"),
+            icon: "notebook",
+            href: switch_family_path(family_id: ledger.id),
+            selected: ledger == Current.family
+          ) %>
+        <% end %>
+      <% end %>
+
       <%= render DS::MenuItem.new(variant: "divider") %>
 
       <%= render DS::MenuItem.new(variant: "button", roving: false, text: t(".log_out"), icon: "log-out", href: session_path(Current.session), method: :delete) %>

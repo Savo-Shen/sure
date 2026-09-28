@@ -28,11 +28,15 @@ class Chat < ApplicationRecord
   ].freeze
 
   belongs_to :user
+  belongs_to :family
 
   has_one :viewer, class_name: "User", foreign_key: :last_viewed_chat_id, dependent: :nullify # "Last chat user has viewed"
   has_many :messages, dependent: :destroy
 
+  before_validation -> { self.family ||= user&.active_family }, on: :create
+
   validates :title, presence: true
+  validate :user_belongs_to_family, on: :create
 
   scope :ordered, -> { order(created_at: :desc) }
 
@@ -209,6 +213,12 @@ class Chat < ApplicationRecord
   end
 
   private
+
+    def user_belongs_to_family
+      return if user.nil? || family.nil?
+
+      errors.add(:family, :invalid) unless user.member_of?(family)
+    end
 
     def undelivered_error_payload(assistant_message)
       {

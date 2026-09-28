@@ -48,7 +48,7 @@ class Assistant::Function::GetValuations < Assistant::Function
   end
 
   def call(params = {})
-    accessible_ids = user.accessible_accounts.visible.select(:id)
+    accessible_ids = accessible_accounts.visible.select(:id)
     scope = family.entries
       .where(entryable_type: "Valuation", account_id: accessible_ids)
       .includes(:account, :entryable)

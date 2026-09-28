@@ -114,7 +114,7 @@ class Assistant::Function::GetBalanceSheet < Assistant::Function
     end
 
     def historical_data(period, interval, classification: nil)
-      scope = user.accessible_accounts.visible
+      scope = accessible_accounts.visible
       scope = scope.where(classification: classification) if classification.present?
 
       if period.start_date == Date.current

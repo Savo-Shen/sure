@@ -148,7 +148,7 @@ class Assistant::Function::GetHoldings < Assistant::Function
     end
 
     def investment_accounts
-      user.accessible_accounts.visible.where(accountable_type: SUPPORTED_ACCOUNT_TYPES)
+      accessible_accounts.visible.where(accountable_type: SUPPORTED_ACCOUNT_TYPES)
     end
 
     def investment_account_names

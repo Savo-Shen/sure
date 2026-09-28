@@ -113,6 +113,24 @@ class UserMembershipTest < ActiveSupport::TestCase
     assert_not User.exists?(solo.id), "users with no other ledger are still removed"
   end
 
+  test "purge removes secondary ledgers the user was the only member of" do
+    home = Family.create!(name: "Home ledger", currency: "USD")
+    shared = Family.create!(name: "Shared ledger", currency: "USD")
+    side = Family.create!(name: "Side ledger", currency: "USD")
+    user = home.users.create!(email: "purged@example.com", password: user_password_test, role: "admin")
+    partner = home.users.create!(email: "partner@example.com", password: user_password_test, role: "member")
+    FamilyMembership.create!(user: user, family: shared, role: "owner")
+    FamilyMembership.create!(user: partner, family: shared, role: "editor")
+    FamilyMembership.create!(user: user, family: side, role: "owner")
+
+    user.purge
+
+    assert_not User.exists?(user.id)
+    assert_not Family.exists?(side.id), "a ledger with no other members is removed"
+    assert Family.exists?(shared.id), "ledgers with other members survive"
+    assert Family.exists?(home.id)
+  end
+
   test "role predicates resolve against the active ledger, not the primary one" do
     FamilyMembership.create!(user: @admin, family: @other_family, role: "viewer")
     session = @admin.sessions.create!

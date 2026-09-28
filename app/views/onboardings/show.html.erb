@@ -37,7 +37,7 @@
 
       <% unless @invitation %>
         <div class="space-y-4 mb-4">
-          <%= form.fields_for :family do |family_form| %>
+          <%= form.fields_for :family, Current.family do |family_form| %>
             <div class="bg-container rounded-lg shadow-border-xs p-4">
               <div class="space-y-2">
                 <p class="text-sm font-medium text-primary"><%= t(".moniker_prompt", product_name: product_name) %></p>

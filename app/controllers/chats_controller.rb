@@ -5,7 +5,7 @@ class ChatsController < ApplicationController
 
   def index
     @chat = nil # override application_controller default behavior of setting @chat to last viewed chat
-    @chats = Current.user.chats.order(created_at: :desc)
+    @chats = ledger_chats.order(created_at: :desc)
   end
 
   def show
@@ -13,13 +13,13 @@ class ChatsController < ApplicationController
   end
 
   def new
-    @chat = Current.user.chats.new(
+    @chat = ledger_chats.new(
       title: t(".default_title", timestamp: Time.current.strftime("%Y-%m-%d %H:%M"))
     )
   end
 
   def create
-    @chat = Current.user.chats.start!(chat_params[:content], model: chat_params[:ai_model])
+    @chat = ledger_chats.start!(chat_params[:content], model: chat_params[:ai_model])
     set_last_viewed_chat(@chat)
     redirect_to chat_path(@chat, thinking: true)
   end
@@ -50,7 +50,11 @@ class ChatsController < ApplicationController
 
   private
     def set_chat
-      @chat = Current.user.chats.find(params[:id])
+      @chat = ledger_chats.find(params[:id])
+    end
+
+    def ledger_chats
+      Current.user.chats.where(family: Current.family)
     end
 
     def set_last_viewed_chat(chat)

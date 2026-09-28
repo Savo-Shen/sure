@@ -82,7 +82,7 @@ class Assistant::External < Assistant::Base
 
     model = client.chat(
       messages: messages,
-      user: "sure-family-#{chat.user.family_id}"
+      user: "sure-family-#{chat.family_id}"
     ) do |text|
       assistant_message.append_text!(text)
     end

@@ -163,7 +163,7 @@ class Assistant::Function::GetTransactions < Assistant::Function
     search = Transaction::Search.new(
       family,
       filters: search_params,
-      accessible_account_ids: user.accessible_accounts.visible.pluck(:id)
+      accessible_account_ids: accessible_accounts.visible.pluck(:id)
     )
     transactions_query = search.transactions_scope
     pagy_query = ordered(transactions_query, params)

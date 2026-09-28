@@ -40,7 +40,7 @@ class MessagesController < ApplicationController
 
   private
     def set_chat
-      @chat = Current.user.chats.find(params[:chat_id])
+      @chat = Current.user.chats.where(family: Current.family).find(params[:chat_id])
     end
 
     def message_params

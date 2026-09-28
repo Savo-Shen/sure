@@ -27,7 +27,8 @@ class UsersController < ApplicationController
       end
     else
       was_ai_enabled = @user.ai_enabled
-      if @user.update(user_params.except(:redirect_to, :delete_profile_image))
+      user_attrs = user_params.except(:redirect_to, :delete_profile_image, :family_attributes)
+      if update_user_and_ledger(user_attrs, user_params[:family_attributes])
         @user.profile_image.purge if should_purge_profile_image?
 
         # Add a special notice if AI was just enabled or disabled
@@ -77,6 +78,21 @@ class UsersController < ApplicationController
   end
 
   private
+    # Ledger settings belong to the active ledger, which is not necessarily the
+    # user's primary family, so they bypass the user's nested family attributes.
+    def update_user_and_ledger(user_attrs, ledger_attrs)
+      return @user.update(user_attrs) if ledger_attrs.blank?
+
+      ledger = Current.family
+      User.transaction do
+        unless ledger.update(ledger_attrs.except(:id)) && @user.update(user_attrs)
+          ledger.errors.each { |error| @user.errors.import(error, attribute: :"family.#{error.attribute}") }
+          raise ActiveRecord::Rollback
+        end
+      end
+      @user.errors.empty?
+    end
+
     def handle_redirect(notice)
       case user_params[:redirect_to]
       when "onboarding_preferences"

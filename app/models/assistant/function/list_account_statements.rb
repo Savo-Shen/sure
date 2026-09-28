@@ -89,7 +89,7 @@ class Assistant::Function::ListAccountStatements < Assistant::Function
     # manager: unlinked statements are visible, linked ones follow the account.
     scope = family.account_statements
       .where(account_id: nil)
-      .or(family.account_statements.where(account_id: user.accessible_accounts.select(:id)))
+      .or(family.account_statements.where(account_id: accessible_accounts.select(:id)))
       .includes(:account, :suggested_account)
       .ordered
 

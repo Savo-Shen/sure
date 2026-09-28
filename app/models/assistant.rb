@@ -86,7 +86,7 @@ module Assistant
 
       def implementation_for(chat)
         raise Error, "chat is required" if chat.blank?
-        type = ENV["ASSISTANT_TYPE"].presence || chat.user&.family&.assistant_type.presence || "builtin"
+        type = ENV["ASSISTANT_TYPE"].presence || chat.family&.assistant_type.presence || "builtin"
         REGISTRY.fetch(type) { REGISTRY["builtin"] }
       end
   end

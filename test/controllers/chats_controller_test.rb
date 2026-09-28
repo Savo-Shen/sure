@@ -74,4 +74,21 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
     delete chat_url(other_chat)
     assert_response :not_found
   end
+
+  test "chats are scoped to the active ledger" do
+    ledger_b = families(:empty)
+    FamilyMembership.create!(user: @user, family: ledger_b, role: "editor")
+    primary_chat = chats(:one)
+    post switch_family_path(family_id: ledger_b.id)
+
+    get chat_url(primary_chat)
+    assert_response :not_found
+
+    get chats_url
+    assert_response :success
+    assert_not_includes response.body, primary_chat.title
+
+    post chats_url, params: { chat: { content: "Ledger B question", ai_model: "gpt-4.1" } }
+    assert_equal ledger_b, @user.chats.order(:created_at).last.family
+  end
 end

@@ -47,6 +47,27 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ "USD", "SGD" ], @user.family.reload.enabled_currency_codes
   end
 
+  test "ledger settings are written to the active ledger, not the primary one" do
+    sign_in member = users(:family_member)
+    ledger_b = families(:empty)
+    FamilyMembership.create!(user: member, family: ledger_b, role: "owner")
+    post switch_family_path(family_id: ledger_b.id)
+    primary_moniker = member.family.moniker
+
+    patch user_url(member), params: {
+      user: {
+        redirect_to: "preferences",
+        family_attributes: { id: member.family.id, name: "Ledger B renamed", moniker: "Group" }
+      }
+    }
+
+    assert_redirected_to settings_preferences_url
+    assert_equal "Ledger B renamed", ledger_b.reload.name
+    assert_equal "Group", ledger_b.moniker
+    assert_equal primary_moniker, member.family.reload.moniker
+    assert_not_equal "Ledger B renamed", member.family.name
+  end
+
   test "non-admin cannot update enabled family currencies" do
     sign_in @member = users(:family_member)
     original_codes = @member.family.enabled_currency_codes

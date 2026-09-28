@@ -139,8 +139,7 @@ class Sync < ApplicationRecord
       end
 
       def account_syncable_ids(family, resource_owner)
-        (resource_owner ? resource_owner.accessible_accounts : family.accounts)
-          .where(family_id: family.id)
+        (resource_owner ? family.accounts.accessible_by(resource_owner) : family.accounts)
           .select(:id)
       end
 

@@ -8,7 +8,7 @@ class Api::V1::ChatsController < Api::V1::BaseController
   before_action :set_chat, only: [ :show, :update, :destroy ]
 
   def index
-    @pagy, @chats = pagy(current_resource_owner.chats.ordered, items: 20)
+    @pagy, @chats = pagy(ledger_chats.ordered, items: 20)
   end
 
   def show
@@ -17,7 +17,7 @@ class Api::V1::ChatsController < Api::V1::BaseController
   end
 
   def create
-    @chat = current_resource_owner.chats.build(title: chat_params[:title])
+    @chat = ledger_chats.build(title: chat_params[:title])
 
     if @chat.save
       if chat_params[:message].present?
@@ -74,13 +74,17 @@ class Api::V1::ChatsController < Api::V1::BaseController
     end
 
     def set_chat
-      @chat = current_resource_owner.chats.find(params[:id])
+      @chat = ledger_chats.find(params[:id])
     rescue ActiveRecord::RecordNotFound
       render json: { error: "Chat not found" }, status: :not_found
     end
 
     def chat_params
       params.permit(:title, :message, :model)
+    end
+
+    def ledger_chats
+      current_resource_owner.chats.where(family: current_resource_owner.family)
     end
 
     def update_chat_params

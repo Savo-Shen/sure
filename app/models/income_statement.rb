@@ -264,7 +264,7 @@ class IncomeStatement
       @included_account_ids ||= if @accounts
         @accounts.pluck(:id)
       elsif user
-        user.finance_accounts.pluck(:id)
+        family.accounts.included_in_finances_for(user).pluck(:id)
       end
     end
 

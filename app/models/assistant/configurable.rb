@@ -54,8 +54,8 @@ module Assistant::Configurable
 
   class_methods do
     def config_for(chat)
-      preferred_currency = Money::Currency.new(chat.user.family.currency)
-      preferred_date_format = chat.user.family.date_format
+      preferred_currency = Money::Currency.new(chat.family.currency)
+      preferred_date_format = chat.family.date_format
 
       if chat.user.ui_layout_intro?
         {
@@ -64,7 +64,7 @@ module Assistant::Configurable
         }
       else
         {
-          instructions: default_instructions(preferred_currency, preferred_date_format, user: chat.user),
+          instructions: default_instructions(preferred_currency, preferred_date_format, user: chat.user, family: chat.family),
           functions: default_functions(chat.user)
         }
       end
@@ -106,20 +106,20 @@ module Assistant::Configurable
         Assistant.function_classes(user)
       end
 
-      def default_instructions(preferred_currency, preferred_date_format, user: nil)
-        static = user&.family&.ai_prompt(:chat_system) || Assistant::Configurable::STATIC_INSTRUCTIONS
+      def default_instructions(preferred_currency, preferred_date_format, user: nil, family: user&.family)
+        static = family&.ai_prompt(:chat_system) || Assistant::Configurable::STATIC_INSTRUCTIONS
 
-        "#{static}\n#{session_context(preferred_currency, preferred_date_format, user: user)}"
+        "#{static}\n#{session_context(preferred_currency, preferred_date_format, user: user, family: family)}"
       end
 
-      def session_context(preferred_currency, preferred_date_format, user: nil)
+      def session_context(preferred_currency, preferred_date_format, user: nil, family: user&.family)
         <<~PROMPT
           ## Session context
 
           - Today's date: #{Date.current}. For functions that require dates, use it as your reference point.
           - Date format: #{preferred_date_format}
           - Preferred currency: #{preferred_currency.iso_code} (symbol #{preferred_currency.symbol}, precision #{preferred_currency.default_precision}, format #{preferred_currency.default_format}, separator "#{preferred_currency.separator}", delimiter "#{preferred_currency.delimiter}")
-          #{accounts_context(user)}#{categories_context(user)}
+          #{accounts_context(user, family)}#{categories_context(user, family)}
         PROMPT
       end
 
@@ -129,10 +129,10 @@ module Assistant::Configurable
       ACCOUNTS_ROSTER_LIMIT = 25
       CATEGORY_NAMES_LIMIT = 60
 
-      def accounts_context(user)
+      def accounts_context(user, family)
         return "" if user.nil?
 
-        accounts = user.accessible_accounts.visible.to_a
+        accounts = family.accounts.accessible_by(user).visible.to_a
         return "" if accounts.empty?
 
         if accounts.size > ACCOUNTS_ROSTER_LIMIT || Assistant::TokenBudget.small_context?
@@ -158,10 +158,10 @@ module Assistant::Configurable
         end
       end
 
-      def categories_context(user)
+      def categories_context(user, family)
         return "" if user.nil?
 
-        names = user.family.categories.pluck(:name)
+        names = family.categories.pluck(:name)
         return "" if names.empty?
 
         if names.size > CATEGORY_NAMES_LIMIT || Assistant::TokenBudget.small_context?

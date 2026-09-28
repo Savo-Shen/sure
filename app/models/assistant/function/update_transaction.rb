@@ -101,7 +101,7 @@ class Assistant::Function::UpdateTransaction < Assistant::Function
 
       family.transactions
         .joins(:entry)
-        .where(entries: { account_id: user.accessible_accounts.visible.select(:id) })
+        .where(entries: { account_id: accessible_accounts.visible.select(:id) })
         .find_by(id: id)
     end
 

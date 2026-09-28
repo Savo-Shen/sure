@@ -68,6 +68,7 @@ class ApplicationController < ActionController::Base
     # By default, we show the user the last chat they interacted with
     def set_default_chat
       @last_viewed_chat = Current.user&.last_viewed_chat
+      @last_viewed_chat = nil unless @last_viewed_chat&.family_id == Current.family&.id
       @chat = @last_viewed_chat
     end
 

@@ -11,8 +11,9 @@ class Assistant::Function
 
   MAX_PAGE_SIZE = 100
 
-  def initialize(user)
+  def initialize(user, family: nil)
     @user = user
+    @family = family
   end
 
   def call(params = {})
@@ -114,8 +115,13 @@ class Assistant::Function
       page.positive? ? page : 1
     end
 
+    # The chat's ledger; the user's primary family when called without a chat.
     def family
-      user.family
+      @family || user.family
+    end
+
+    def accessible_accounts
+      family.accounts.accessible_by(user)
     end
 
     def valid_uuid?(str)

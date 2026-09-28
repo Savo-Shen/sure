@@ -31,7 +31,7 @@ class AssistantConfigurableTest < ActiveSupport::TestCase
 
   test "a family's chat_system override replaces the static block but keeps session context" do
     chat = chats(:one)
-    chat.user.family.update!(ai_prompt_chat_system: "CUSTOM IDENTITY")
+    chat.family.update!(ai_prompt_chat_system: "CUSTOM IDENTITY")
 
     instructions = Assistant.config_for(chat)[:instructions]
 
@@ -43,7 +43,7 @@ class AssistantConfigurableTest < ActiveSupport::TestCase
 
   test "session context lists accounts and categories for a typical family" do
     chat = chats(:one)
-    family = chat.user.family
+    family = chat.family
 
     # The roster only itemizes when the model's context window is comfortable
     Setting.stubs(:llm_context_window).returns(128_000)
@@ -106,5 +106,24 @@ class AssistantConfigurableTest < ActiveSupport::TestCase
 
     assert_includes config[:instructions],
       "Never mention internal tool or function names in your responses"
+  end
+
+  test "uses the chat's ledger rather than the user's primary family" do
+    user = users(:family_admin)
+    ledger_b = families(:empty)
+    ledger_b.update!(currency: "EUR", date_format: "%d.%m.%Y")
+    FamilyMembership.create!(user: user, family: ledger_b, role: "editor")
+    chat = Chat.create!(user: user, family: ledger_b, title: "Ledger B")
+
+    config = Assistant.config_for(chat)
+
+    assert_includes config[:instructions], "Preferred currency: EUR"
+    assert_includes config[:instructions], "Date format: %d.%m.%Y"
+  end
+
+  test "rejects a chat in a ledger the user does not belong to" do
+    chat = Chat.new(user: users(:family_admin), family: families(:empty), title: "Nope")
+
+    assert_not chat.valid?
   end
 end
