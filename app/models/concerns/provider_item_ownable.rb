@@ -88,17 +88,16 @@ module ProviderItemOwnable
       return if owner.present?
 
       self.owner =
-        if Current.user.present? && Current.user.family_id == family_id
+        if Current.user.present? && Current.user.member_of?(family)
           Current.user
         else
-          family&.users&.where(role: "admin")&.order(:created_at, :id)&.first ||
-            family&.users&.where(role: "super_admin")&.order(:created_at, :id)&.first
+          family&.family_memberships&.by_privilege&.first&.user
         end
     end
 
     def owner_belongs_to_family
       return if owner.blank?
 
-      errors.add(:owner, :invalid) unless owner.family_id == family_id
+      errors.add(:owner, :invalid) unless owner.member_of?(family)
     end
 end

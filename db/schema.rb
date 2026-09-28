@@ -904,9 +904,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_120000) do
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.index ["family_id", "user_id"], name: "index_family_memberships_on_family_id_and_user_id"
-    t.index ["family_id"], name: "index_family_memberships_on_family_id"
     t.index ["user_id", "family_id"], name: "index_family_memberships_on_user_id_and_family_id", unique: true
-    t.index ["user_id"], name: "index_family_memberships_on_user_id"
     t.check_constraint "role::text = ANY (ARRAY['owner'::character varying, 'admin'::character varying, 'editor'::character varying, 'viewer'::character varying]::text[])", name: "chk_family_memberships_role_enum"
   end
 

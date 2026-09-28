@@ -9,6 +9,14 @@ class FamilyMembership < ApplicationRecord
 
   validates :user_id, uniqueness: { scope: :family_id }
 
+  # role is a string column, so SQL ordering on it is alphabetical rather than
+  # privilege order. This CASE restores owner > admin > editor > viewer for the
+  # few places that must pick "the most privileged member" in the query layer.
+  # Ties break on the USER's created_at/id (not the membership's), matching how
+  # account age used to decide fallbacks before memberships existed.
+  PRIVILEGE_ORDER_SQL = "CASE family_memberships.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 ELSE 3 END".freeze
+  scope :by_privilege, -> { joins(:user).order(Arel.sql(PRIVILEGE_ORDER_SQL), "users.created_at", "users.id") }
+
   # Maps a legacy users.role value onto the membership role set. Kept next to
   # the role list so the backfill migration and the runtime sync hook can never
   # disagree about the mapping.
@@ -18,6 +26,16 @@ class FamilyMembership < ApplicationRecord
     when "member" then "editor"
     when "admin", "super_admin" then "owner"
     else "editor"
+    end
+  end
+
+  # Inverse of role_for_legacy_role, for when a membership becomes a user's
+  # primary family and users.role has to describe it again.
+  def self.legacy_role_for(membership_role)
+    case membership_role.to_s
+    when "owner", "admin" then "admin"
+    when "viewer" then "guest"
+    else "member"
     end
   end
 
@@ -35,15 +53,13 @@ class FamilyMembership < ApplicationRecord
     self.class.role_at_least?(role, minimum)
   end
 
-  def owner?
-    role_at_least?("owner")
+  # Role label in the legacy vocabulary the UI still speaks. The primary
+  # ledger keeps users.role so super_admin stays distinguishable.
+  def legacy_role
+    primary? ? user.role : self.class.legacy_role_for(role)
   end
 
-  def admin?
-    role_at_least?("admin")
-  end
-
-  def editor?
-    role_at_least?("editor")
+  def primary?
+    user.family_id == family_id
   end
 end

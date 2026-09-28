@@ -42,6 +42,10 @@ class Family < ApplicationRecord
   CATEGORIZATION_PROVIDERS = %w[llm jev].freeze
   SHARING_DEFAULTS = %w[shared private].freeze
 
+  # Must run before the :users cascade below, which would otherwise delete
+  # people who merely have this as their primary ledger but belong to others.
+  before_destroy :rehome_multi_ledger_users, prepend: true
+
   has_many :users, dependent: :destroy
   has_many :family_memberships, dependent: :destroy
   has_many :members, through: :family_memberships, source: :user
@@ -364,9 +368,26 @@ class Family < ApplicationRecord
     family_memberships.select(&:owner?).map(&:user)
   end
 
+  # Points each user whose primary ledger is this one at their oldest other
+  # membership, carrying that membership's role back into users.role. Users
+  # with no other ledger are left for the :users cascade to delete.
+  def rehome_multi_ledger_users
+    users.find_each do |user|
+      next_membership = user.family_memberships.where.not(family_id: id).order(:created_at, :id).first
+      next unless next_membership
+
+      attrs = { family_id: next_membership.family_id }
+      attrs[:role] = FamilyMembership.legacy_role_for(next_membership.role) unless user.super_admin?
+      attrs[:default_account_id] = nil if user.default_account&.family_id == id
+      user.update!(attrs)
+    end
+  end
+  private :rehome_multi_ledger_users
+
   # Shares every existing account in this family (except ones the user already
   # owns) with the given user, honoring the family's default sharing policy and
-  # the user's role. Guests receive read_only; members/admins receive read_write.
+  # the user's role in THIS family. Viewers receive read_only; editors and
+  # above receive read_write.
   #
   # This is the single entry point for "a member just joined, give them the
   # accounts the family shares by default." It self-guards on the sharing policy
@@ -380,9 +401,12 @@ class Family < ApplicationRecord
     # user_in_same_family / cannot_share_with_owner validations, so this
     # membership check is the ONLY thing preventing cross-family sharing.
     # Do not drop it when refactoring.
-    return unless user&.persisted? && user.family_id == id
+    return unless user&.persisted?
 
-    permission = user.guest? ? "read_only" : "read_write"
+    membership = membership_for(user)
+    return unless membership
+
+    permission = membership.viewer? ? "read_only" : "read_write"
     records = accounts.where.not(owner_id: user.id).pluck(:id).map do |account_id|
       { account_id: account_id, user_id: user.id, permission: permission,
         include_in_finances: true, created_at: Time.current, updated_at: Time.current }

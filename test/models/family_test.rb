@@ -313,6 +313,7 @@ class FamilyTest < ActiveSupport::TestCase
     family.update!(default_account_sharing: "shared")
     newcomer = users(:empty)
     newcomer.update_columns(family_id: family.id, role: "member")
+    newcomer.family_memberships.create!(family: family, role: "editor")
 
     expected_ids = family.accounts.where.not(owner_id: newcomer.id).pluck(:id).sort
     assert expected_ids.any?, "fixture family must have shareable accounts"
@@ -330,6 +331,7 @@ class FamilyTest < ActiveSupport::TestCase
     family.update!(default_account_sharing: "shared")
     newcomer = users(:empty)
     newcomer.update_columns(family_id: family.id, role: "guest")
+    newcomer.family_memberships.create!(family: family, role: "viewer")
 
     expected_ids = family.accounts.where.not(owner_id: newcomer.id).pluck(:id).sort
     assert expected_ids.any?, "fixture family must have shareable accounts"
@@ -369,6 +371,7 @@ class FamilyTest < ActiveSupport::TestCase
     family.update!(default_account_sharing: "shared")
     newcomer = users(:empty)
     newcomer.update_columns(family_id: family.id, role: "member")
+    newcomer.family_memberships.create!(family: family, role: "editor")
     owned = family.accounts.first
     owned.update!(owner: newcomer)
 

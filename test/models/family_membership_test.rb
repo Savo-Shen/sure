@@ -42,11 +42,27 @@ class FamilyMembershipTest < ActiveSupport::TestCase
     assert_not FamilyMembership.role_at_least?("nonsense", "viewer")
   end
 
-  test "role predicate helpers use at-least semantics" do
+  test "enum predicates are exact; role_at_least? carries the hierarchy" do
     admin_membership = FamilyMembership.new(user: @admin, family: @family, role: "admin")
 
     assert admin_membership.admin?
-    assert admin_membership.editor?
+    assert_not admin_membership.editor?
     assert_not admin_membership.owner?
+    assert admin_membership.role_at_least?("editor")
+    assert_not admin_membership.role_at_least?("owner")
+  end
+
+  test "legacy_role_for maps membership roles back to the legacy vocabulary" do
+    assert_equal "admin", FamilyMembership.legacy_role_for("owner")
+    assert_equal "admin", FamilyMembership.legacy_role_for("admin")
+    assert_equal "member", FamilyMembership.legacy_role_for("editor")
+    assert_equal "guest", FamilyMembership.legacy_role_for("viewer")
+  end
+
+  test "by_privilege orders owner, admin, editor, viewer" do
+    family = families(:empty)
+    roles = family.family_memberships.by_privilege.map(&:role)
+
+    assert_equal roles.sort_by { |role| FamilyMembership::ROLES.index(role) }, roles
   end
 end

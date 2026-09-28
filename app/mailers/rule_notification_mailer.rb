@@ -6,10 +6,11 @@ class RuleNotificationMailer < ApplicationMailer
     @transactions_url = transactions_url
 
     # Admins only: the digest contains transaction details, so never widen the
-    # recipient set to a regular member/guest. super_admin is the family owner
-    # and must be included (see User#admin?); a self-hosted family is commonly a
-    # single super_admin. Skip delivery entirely when there is no admin.
-    recipient = @family.users.find_by(role: %w[admin super_admin])
+    # recipient set to an editor/viewer. Owners and admins of this ledger
+    # qualify, whichever ledger is their primary one. Skip delivery entirely
+    # when there is no admin.
+    recipient = @family.family_memberships.by_privilege
+                       .find_by(role: %w[owner admin])&.user
     return if recipient.nil?
 
     mail(

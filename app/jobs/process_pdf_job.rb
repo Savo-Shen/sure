@@ -29,8 +29,8 @@ class ProcessPdfJob < ApplicationJob
         Rails.logger.info("ProcessPdfJob: Generated #{pdf_import.rows_count} import rows")
       end
 
-      # Find the user who created this import (first admin or any user in the family)
-      user = pdf_import.family.users.find_by(role: :admin) || pdf_import.family.users.first
+      # Notify the ledger's most privileged member (owner/admin first)
+      user = pdf_import.family.family_memberships.by_privilege.first&.user
 
       if user
         pdf_import.send_next_steps_email(user)

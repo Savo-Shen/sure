@@ -2,7 +2,7 @@ class Settings::BudgetSharesController < ApplicationController
   layout "settings"
 
   def update
-    eligible_members = Current.family.users.where.not(id: Current.user.id).where(active: true)
+    eligible_members = Current.family.members.where.not(id: Current.user.id).where(active: true)
 
     BudgetShare.transaction do
       sharing_members_params.each do |member_params|

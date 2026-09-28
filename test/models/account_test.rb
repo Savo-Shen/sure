@@ -584,6 +584,7 @@ class AccountTest < ActiveSupport::TestCase
     @family.update!(default_account_sharing: "private")
     guest = users(:empty)
     guest.update_columns(family_id: @family.id, role: "guest")
+    guest.family_memberships.create!(family: @family, role: "viewer")
 
     account = Account.create_and_sync({
       family: @family,

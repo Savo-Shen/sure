@@ -24,7 +24,7 @@ module BudgetOwnership
     def budget_target_user
       return Current.user if params[:owner].blank? || viewing_household_budget?
 
-      candidate = Current.family.users.find_by(id: params[:owner])
+      candidate = Current.family.members.find_by(id: params[:owner])
       return Current.user if candidate.nil? || candidate.id == Current.user.id
       return candidate if BudgetShare.exists?(owner_id: candidate.id, viewer_id: Current.user.id)
 

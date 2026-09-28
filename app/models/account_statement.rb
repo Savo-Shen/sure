@@ -230,13 +230,13 @@ class AccountStatement < ApplicationRecord
   end
 
   def viewable_by?(user)
-    return false unless user&.family_id == family_id
+    return false unless user&.member_of?(family)
 
     account.present? ? account.shared_with?(user) : self.class.statement_manager?(user)
   end
 
   def manageable_by?(user)
-    return false unless user&.family_id == family_id
+    return false unless user&.member_of?(family)
 
     return self.class.statement_manager?(user) if account.blank?
 

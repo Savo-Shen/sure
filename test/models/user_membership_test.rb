@@ -8,6 +8,8 @@ class UserMembershipTest < ActiveSupport::TestCase
     @member = users(:family_member)
   end
 
+  teardown { Current.reset }
+
   test "membership_for returns the membership for a family the user belongs to" do
     membership = @admin.membership_for(@family)
 
@@ -69,5 +71,87 @@ class UserMembershipTest < ActiveSupport::TestCase
     assert_difference "FamilyMembership.count", -1 do
       @member.destroy
     end
+  end
+
+  test "changing only the legacy role re-syncs the primary membership" do
+    @admin.update!(role: "member")
+    assert_equal "editor", @admin.role_in(@family)
+
+    @admin.update!(role: "guest")
+    assert_equal "viewer", @admin.role_in(@family)
+  end
+
+  test "moving primary family revokes the membership in the old ledger" do
+    @member.update!(family: @other_family)
+
+    assert_not @member.member_of?(@family)
+    assert @member.member_of?(@other_family)
+  end
+
+  test "moving keeps memberships in ledgers other than the one left" do
+    third = Family.create!(name: "Third ledger", currency: "USD")
+    FamilyMembership.create!(user: @member, family: third, role: "viewer")
+
+    @member.update!(family: @other_family)
+
+    assert_equal "viewer", @member.role_in(third)
+  end
+
+  test "destroying a family re-homes members who belong to another ledger" do
+    doomed = Family.create!(name: "Doomed ledger", currency: "USD")
+    multi = doomed.users.create!(email: "multi@example.com", password: user_password_test, role: "member")
+    solo = doomed.users.create!(email: "solo@example.com", password: user_password_test, role: "admin")
+    FamilyMembership.create!(user: multi, family: @other_family, role: "viewer")
+
+    assert doomed.destroy
+
+    multi.reload
+    assert_equal @other_family, multi.family
+    assert_equal "guest", multi.role
+    assert_equal "viewer", multi.role_in(@other_family)
+    assert_nil multi.membership_for(doomed)
+    assert_not User.exists?(solo.id), "users with no other ledger are still removed"
+  end
+
+  test "role predicates resolve against the active ledger, not the primary one" do
+    FamilyMembership.create!(user: @admin, family: @other_family, role: "viewer")
+    session = @admin.sessions.create!
+    session.switch_active_family!(@other_family)
+    Current.session = session
+
+    assert_not @admin.admin?
+    assert_not @admin.member?
+    assert @admin.guest?
+  end
+
+  test "role predicates follow a switch back to the ledger the user owns" do
+    FamilyMembership.create!(user: @admin, family: @other_family, role: "viewer")
+    session = @admin.sessions.create!
+    session.switch_active_family!(@family)
+    Current.session = session
+
+    assert @admin.admin?
+    assert @admin.member?
+    assert_not @admin.guest?
+  end
+
+  test "role predicates honor an editor membership in the active ledger" do
+    session = @member.sessions.create!
+    session.switch_active_family!(@family)
+    Current.session = session
+
+    assert @member.member?
+    assert_not @member.admin?
+    assert_not @member.guest?
+  end
+
+  test "role predicates fall back to the legacy role column without a request context" do
+    Current.reset
+
+    assert @admin.admin?
+    assert @admin.member?
+    assert_not @admin.guest?
+    assert @member.member?
+    assert_not @member.admin?
   end
 end

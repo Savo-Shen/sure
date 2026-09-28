@@ -43,7 +43,7 @@ class AccountShare < ApplicationRecord
     end
 
     def user_in_same_family
-      if account && user && user.family_id != account.family_id
+      if account && user && !user.member_of?(account.family)
         errors.add(:user, "must be in the same family")
       end
     end

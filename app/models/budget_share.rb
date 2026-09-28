@@ -23,8 +23,11 @@ class BudgetShare < ApplicationRecord
     end
 
     def owner_and_viewer_in_same_family
-      if owner && viewer && owner.family_id != viewer.family_id
-        errors.add(:viewer, "must be in the same family")
-      end
+      return unless owner && viewer
+
+      shared_ledger = FamilyMembership.where(user_id: owner.id)
+        .where(family_id: FamilyMembership.where(user_id: viewer.id).select(:family_id))
+        .exists?
+      errors.add(:viewer, "must be in the same family") unless shared_ledger
     end
 end

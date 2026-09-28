@@ -709,12 +709,12 @@ class Account < ApplicationRecord
   end
 
   def auto_share_with_family!
-    # Guests get read_only, everyone else read_write. This mirrors
-    # Family#auto_share_existing_accounts_with so a guest's permission on an
+    # Viewers get read_only, everyone else read_write. This mirrors
+    # Family#auto_share_existing_accounts_with so a viewer's permission on an
     # account is the same whether they joined before or after it was created.
-    records = family.users.where.not(id: owner_id).pluck(:id, :role).map do |user_id, role|
-      { account_id: id, user_id: user_id,
-        permission: role == "guest" ? "read_only" : "read_write",
+    records = family.family_memberships.where.not(user_id: owner_id).map do |membership|
+      { account_id: id, user_id: membership.user_id,
+        permission: membership.viewer? ? "read_only" : "read_write",
         include_in_finances: true, created_at: Time.current, updated_at: Time.current }
     end
 
@@ -726,24 +726,21 @@ class Account < ApplicationRecord
     def assign_default_owner
       return if owner.present?
 
-      if Current.user.present? && Current.user.family_id == family_id
+      if Current.user.present? && Current.user.member_of?(family)
         self.owner = Current.user
       else
-        # `id` breaks ties on `created_at`. Two users of the same role can share
-        # a timestamp (they are created in one transaction, or the column is
-        # backfilled), and ordering on `created_at` alone leaves the winner to
-        # the query plan — so the same family can get a different default owner
-        # from one call to the next.
-        self.owner =
-          family&.users&.where(role: "admin")&.order(:created_at, :id)&.first ||
-          family&.users&.where(role: "super_admin")&.order(:created_at, :id)&.first ||
-          family&.users&.order(:created_at, :id)&.first
+        # `id` breaks ties on `created_at`. Two members of the same role can
+        # share a timestamp (they are created in one transaction, or the
+        # column is backfilled), and ordering on `created_at` alone leaves the
+        # winner to the query plan — so the same family can get a different
+        # default owner from one call to the next.
+        self.owner = family&.family_memberships&.by_privilege&.first&.user
       end
     end
 
     def owner_belongs_to_family
       owner_user = User.lock.find_by(id: owner_id)
-      return if owner_user&.family_id == family_id
+      return if owner_user&.member_of?(family)
 
       errors.add(:owner, :invalid, message: "must belong to the same family as the account")
     end

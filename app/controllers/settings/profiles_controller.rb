@@ -3,7 +3,7 @@ class Settings::ProfilesController < ApplicationController
 
   def show
     @user = Current.user
-    @users = Current.family.users.order(:created_at)
+    @memberships = Current.family.family_memberships.joins(:user).includes(:user).order("users.created_at", "users.id")
     @pending_invitations = Current.family.invitations.pending
     @breadcrumbs = [
       [ t("breadcrumbs.home"), root_path ],
@@ -18,6 +18,9 @@ class Settings::ProfilesController < ApplicationController
       return
     end
 
+    # Primary-ledger users only: destroying the user record would also erase
+    # the ledgers they joined elsewhere. Revoking a joined member's access is
+    # a membership operation, not a user deletion.
     @user = Current.family.users.find(params[:user_id])
 
     if @user == Current.user

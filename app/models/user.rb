@@ -82,10 +82,10 @@ class User < ApplicationRecord
   # Memberships are the source of truth for family access going forward.
   # users.family_id is the legacy "primary family" pointer, kept as a
   # denormalized back-compat column (Current falls back to it). Every path
-  # that changes a user's family — registration, invitation accept, SSO JIT
-  # provisioning, admin transfer — flows through this hook so no path can
-  # strand a user without a membership row.
-  after_save :ensure_family_membership_for_primary_family, if: :saved_change_to_family_id?
+  # that changes a user's family or legacy role — registration, invitation
+  # accept, SSO JIT provisioning and IdP role mapping, admin edits/transfers —
+  # flows through this hook so memberships never drift from those columns.
+  after_save :sync_primary_family_membership, if: -> { saved_change_to_family_id? || saved_change_to_role? }
 
   # Returns the appropriate role for a new user creating a family.
   # The very first user of an instance becomes super_admin; subsequent users
@@ -167,8 +167,21 @@ class User < ApplicationRecord
     impersonator_support_sessions.create!(impersonated: impersonated)
   end
 
+  # Role predicates resolve against the user's membership in the ACTIVE ledger
+  # (Current.family): a viewer of a shared ledger keeps viewer powers there
+  # even when they own their own ledger. super_admin stays instance-level.
+  # Outside a request (jobs, mailers) Current.family is nil and the legacy
+  # users.role column answers instead, preserving pre-multi-ledger behavior.
   def admin?
-    super_admin? || role == "admin"
+    super_admin? || active_ledger_role_at_least?("admin")
+  end
+
+  def member?
+    active_ledger_role_at_least?("editor")
+  end
+
+  def guest?
+    !member?
   end
 
   def accessible_accounts
@@ -383,8 +396,12 @@ class User < ApplicationRecord
     raise InactiveError
   end
 
+  # Asks about the user's PRIMARY ledger explicitly: admin? would answer for
+  # whichever ledger the acting user happens to have open.
   def can_deactivate
-    if admin? && family.users.count > 1
+    primary_admin = super_admin? || FamilyMembership.role_at_least?(primary_membership_role, "admin")
+
+    if primary_admin && family.family_memberships.where.not(user_id: id).exists?
       errors.add(:base, :cannot_deactivate_admin_with_other_users)
     end
   end
@@ -500,10 +517,15 @@ class User < ApplicationRecord
   def purge
     if last_user_in_family?
       family.destroy
-    else
-      reassign_owned_accounts!
-      destroy
+      # Family#destroy re-homes members who still belong to another ledger
+      # instead of deleting them; finish purging this user from there.
+      return unless User.exists?(id)
+
+      reload
     end
+
+    reassign_owned_accounts!
+    destroy
   end
 
   # MFA
@@ -586,7 +608,8 @@ class User < ApplicationRecord
     return nil unless default_account_id.present?
 
     account = default_account
-    return nil unless account&.eligible_for_transaction_default? && account.family_id == family_id
+    active_family = Current.user == self ? Current.family : family
+    return nil unless account&.eligible_for_transaction_default? && account.family_id == active_family&.id
 
     account
   end
@@ -730,28 +753,63 @@ class User < ApplicationRecord
   end
 
   private
-    def ensure_family_membership_for_primary_family
+    # Membership-role lookup for the active ledger with a legacy-column
+    # fallback, so code running without a request context behaves exactly as
+    # it did before memberships existed.
+    def active_ledger_role_at_least?(minimum)
+      membership = membership_for(Current.family)
+
+      if membership
+        membership.role_at_least?(minimum)
+      else
+        FamilyMembership.role_at_least?(FamilyMembership.role_for_legacy_role(role), minimum)
+      end
+    end
+
+    def primary_membership_role
+      membership_for(family)&.role || FamilyMembership.role_for_legacy_role(role)
+    end
+
+    def sync_primary_family_membership
       return if family_id.blank?
 
-      family_memberships.find_or_initialize_by(family_id: family_id) do |membership|
-        membership.role = FamilyMembership.role_for_legacy_role(role)
-      end.save!
+      if saved_change_to_family_id?
+        # A family_id change is a MOVE: keep an existing membership's role in
+        # the destination (an invitation may have set it) and revoke the old
+        # ledger, otherwise the switcher would still let the user back in.
+        family_memberships.find_or_initialize_by(family_id: family_id) do |membership|
+          membership.role = FamilyMembership.role_for_legacy_role(role)
+        end.save!
+
+        previous_family_id = family_id_before_last_save
+        family_memberships.where(family_id: previous_family_id).destroy_all if previous_family_id.present?
+      else
+        family_memberships.find_or_initialize_by(family_id: family_id)
+          .update!(role: FamilyMembership.role_for_legacy_role(role))
+      end
+
+      family_memberships.reset
     end
 
     def apply_ui_layout_defaults
       self.ui_layout = (ui_layout.presence || self.class.default_ui_layout)
     end
 
+    # UI defaults are a property of the user record, so they follow the legacy
+    # role being saved — not the active ledger's membership, which predicates
+    # like guest?/member? read and which may not even exist yet on create.
     def apply_role_based_ui_defaults
+      saving_guest = role == "guest"
+
       if ui_layout_intro?
-        if guest?
+        if saving_guest
           self.show_sidebar = false
           self.show_ai_sidebar = false
           self.ai_enabled = true
         else
           self.ui_layout = "dashboard"
         end
-      elsif guest?
+      elsif saving_guest
         self.ui_layout = "intro"
         self.show_sidebar = false
         self.show_ai_sidebar = false
@@ -763,7 +821,7 @@ class User < ApplicationRecord
         self.show_ai_sidebar = true unless show_ai_sidebar
       end
 
-      if new_record? && member? && !ai_available?
+      if new_record? && role == "member" && !ai_available?
         self.show_ai_sidebar = false
       end
     end
@@ -796,23 +854,21 @@ class User < ApplicationRecord
     end
 
     def last_user_in_family?
-      family.users.count == 1
+      !family.family_memberships.where.not(user_id: id).exists?
     end
 
+    # Owned accounts can live in any ledger the user belongs to; each one goes
+    # to the most privileged remaining member of that account's ledger.
     def reassign_owned_accounts!
-      account_ids = owned_accounts.pluck(:id)
-      return if account_ids.empty?
+      owned_accounts.pluck(:id, :family_id).group_by(&:last).each do |account_family_id, rows|
+        account_ids = rows.map(&:first)
+        new_owner = FamilyMembership.where(family_id: account_family_id).where.not(user_id: id).by_privilege.first&.user
+        next unless new_owner
 
-      new_owner = family.users.where.not(id: id)
-                        .find_by(role: %w[admin super_admin]) ||
-                  family.users.where.not(id: id)
-                        .order(:created_at).first
-
-      return unless new_owner
-
-      Account.where(id: account_ids).update_all(owner_id: new_owner.id)
-      # Remove shares the new owner had for these accounts (they now own them)
-      AccountShare.where(account_id: account_ids, user_id: new_owner.id).delete_all
+        Account.where(id: account_ids).update_all(owner_id: new_owner.id)
+        # Remove shares the new owner had for these accounts (they now own them)
+        AccountShare.where(account_id: account_ids, user_id: new_owner.id).delete_all
+      end
     end
 
     def deactivated_email

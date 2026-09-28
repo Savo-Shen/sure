@@ -57,7 +57,7 @@ class FinancekitItem < ApplicationRecord
     error = status == "repair_required" ? "repair_required" : "connection_revoked"
     Financekit.require!(status == "active", error, 403)
     user.reload
-    Financekit.require!(user.active? && user.family_id == family_id && user.admin?,
+    Financekit.require!(user.active? && user.member_of?(family) && user.admin?,
       "publisher_forbidden", 403)
     Financekit.require!(!pending_account_setup?, "account_setup_required", 409)
     permitted_ids = family.accounts.writable_by(user).pluck(:id)
