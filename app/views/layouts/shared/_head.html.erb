@@ -3,6 +3,9 @@
 
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
+  <% if Current.family %>
+    <meta name="active-family-id" content="<%= Current.family.id %>">
+  <% end %>
 
   <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
 

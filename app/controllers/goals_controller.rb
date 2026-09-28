@@ -1,4 +1,5 @@
 class GoalsController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :require_preview_features!
   before_action :set_goal, only: %i[show edit update destroy pause resume complete archive unarchive reopen consume record_consumption]
 

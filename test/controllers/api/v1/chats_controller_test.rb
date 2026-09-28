@@ -102,8 +102,7 @@ class Api::V1::ChatsControllerTest < ActionDispatch::IntegrationTest
   test "should not access other user's chat" do
     other_user = users(:family_member)
     other_user.update!(family: families(:empty))
-    other_chat = chats(:two)
-    other_chat.update!(user: other_user)
+    other_chat = Chat.create!(user: other_user, family: families(:empty), title: "Other chat")
 
     get "/api/v1/chats/#{other_chat.id}", headers: bearer_auth_header(@read_token)
     assert_response :not_found

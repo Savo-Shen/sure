@@ -50,6 +50,17 @@ Turbo.StreamActions.redirect = function () {
   Turbo.visit(this.target, { action: "replace" });
 };
 
+// The active ledger is session-wide, so tag writes with the ledger this page
+// was rendered for; the server refuses them if another tab has switched since.
+document.addEventListener("turbo:before-fetch-request", (event) => {
+  const { fetchOptions } = event.detail;
+  const method = (fetchOptions.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return;
+
+  const familyId = document.querySelector('meta[name="active-family-id"]')?.content;
+  if (familyId) fetchOptions.headers["X-Active-Family-Id"] = familyId;
+});
+
 // Register service worker for PWA offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

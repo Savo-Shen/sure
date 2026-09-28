@@ -243,7 +243,7 @@ class Chat < ApplicationRecord
           waited_seconds: (Time.current - assistant_message.created_at).round,
           background_jobs: BackgroundJobHealth.snapshot
         },
-        family: user&.family
+        family: family
       )
     end
 

@@ -1,4 +1,5 @@
 class FamilyMerchantsController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :set_merchant, only: %i[edit update destroy]
 
   def index

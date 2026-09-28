@@ -1,4 +1,5 @@
 class TagsController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :set_tag, only: %i[edit update destroy]
 
   def index

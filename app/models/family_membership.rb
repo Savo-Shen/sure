@@ -12,6 +12,9 @@ class FamilyMembership < ApplicationRecord
   # The membership is the source of truth for roles; users.role mirrors the
   # primary ledger's membership in the legacy vocabulary.
   after_save :project_role_onto_user, if: -> { saved_change_to_role? && primary? }
+  # Leaving a ledger must not leave access behind that a later rejoin (with a
+  # possibly lower role) would silently restore.
+  after_destroy :revoke_ledger_access
 
   # role is a string column, so SQL ordering on it is alphabetical rather than
   # privilege order. This CASE restores owner > admin > editor > viewer for the
@@ -64,7 +67,7 @@ class FamilyMembership < ApplicationRecord
   # Role label in the legacy vocabulary the UI still speaks. The primary
   # ledger keeps users.role so super_admin stays distinguishable.
   def legacy_role
-    primary? ? user.role : self.class.legacy_role_for(role)
+    primary? || user.super_admin? ? user.role : self.class.legacy_role_for(role)
   end
 
   def primary?
@@ -83,5 +86,14 @@ class FamilyMembership < ApplicationRecord
 
       legacy = self.class.legacy_role_for(role)
       user.update!(role: legacy) unless user.role == legacy
+    end
+
+    def revoke_ledger_access
+      AccountShare.where(user_id: user_id, account_id: Account.where(family_id: family_id).select(:id)).delete_all
+      Chat.where(user_id: user_id, family_id: family_id).destroy_all
+
+      co_member_ids = FamilyMembership.where(family_id: FamilyMembership.where(user_id: user_id).select(:family_id)).select(:user_id)
+      BudgetShare.where(owner_id: user_id).where.not(viewer_id: co_member_ids).delete_all
+      BudgetShare.where(viewer_id: user_id).where.not(owner_id: co_member_ids).delete_all
     end
 end

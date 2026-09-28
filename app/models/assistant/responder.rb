@@ -110,7 +110,7 @@ class Assistant::Responder
         previous_response_id: previous_response_id,
         session_id: chat_session_id,
         user_identifier: chat_user_identifier,
-        family: message.chat&.user&.family
+        family: message.chat&.family
       )
 
       unless response.success?

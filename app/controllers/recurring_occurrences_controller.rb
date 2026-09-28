@@ -1,4 +1,5 @@
 class RecurringOccurrencesController < ApplicationController
+  require_ledger_editor_for_writes
   include RecurringFeatureGuardable
 
   layout "settings"

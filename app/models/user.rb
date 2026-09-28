@@ -77,6 +77,7 @@ class User < ApplicationRecord
   enum :ui_layout, { dashboard: "dashboard", intro: "intro" }, validate: true, prefix: true
 
   before_validation :apply_ui_layout_defaults
+  before_validation :adopt_destination_membership_role, if: -> { persisted? && will_save_change_to_family_id? && !will_save_change_to_role? }
   before_validation :apply_role_based_ui_defaults
 
   # Memberships are the source of truth for family access going forward.
@@ -784,6 +785,16 @@ class User < ApplicationRecord
     # membership only when that coarse level really changed, so e.g. an SSO
     # sync to "admin" leaves an "admin" membership alone instead of promoting
     # it to "owner".
+    # Moving into a ledger where a membership (e.g. from an invitation) already
+    # defines the role: users.role follows it, before the role-based UI
+    # defaults run so this path lands on the same layout as any other.
+    def adopt_destination_membership_role
+      return if super_admin?
+
+      membership = family_memberships.find_by(family_id: family_id)
+      self.role = FamilyMembership.legacy_role_for(membership.role) if membership
+    end
+
     def sync_primary_family_membership
       return if family_id.blank?
 
@@ -794,10 +805,6 @@ class User < ApplicationRecord
         membership.update!(role: desired_role)
       elsif saved_change_to_role?
         membership.update!(role: desired_role) unless FamilyMembership.same_legacy_level?(membership.role, desired_role)
-      elsif !super_admin? && !FamilyMembership.same_legacy_level?(membership.role, desired_role)
-        # Moved into a ledger where an existing membership (e.g. from an
-        # invitation) already defines the role.
-        update_column(:role, FamilyMembership.legacy_role_for(membership.role))
       end
 
       # A family_id change is a MOVE: revoke the old ledger, otherwise the

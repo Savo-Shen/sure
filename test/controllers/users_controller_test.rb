@@ -57,7 +57,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     patch user_url(member), params: {
       user: {
         redirect_to: "preferences",
-        family_attributes: { id: member.family.id, name: "Ledger B renamed", moniker: "Group" }
+        family_attributes: { id: ledger_b.id, name: "Ledger B renamed", moniker: "Group" }
       }
     }
 
@@ -66,6 +66,22 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Group", ledger_b.moniker
     assert_equal primary_moniker, member.family.reload.moniker
     assert_not_equal "Ledger B renamed", member.family.name
+  end
+
+  test "a ledger form rendered before switching ledgers is refused" do
+    sign_in member = users(:family_member)
+    primary = member.family
+    ledger_b = families(:empty)
+    FamilyMembership.create!(user: member, family: ledger_b, role: "owner")
+    post switch_family_path(family_id: ledger_b.id)
+    currencies_before = [ primary.currency, ledger_b.currency ]
+
+    patch user_url(member), params: {
+      user: { redirect_to: "preferences", family_attributes: { id: primary.id, currency: "EUR" } }
+    }
+
+    assert_equal I18n.t("shared.ledger_switched"), flash[:alert]
+    assert_equal currencies_before, [ primary.reload.currency, ledger_b.reload.currency ]
   end
 
   test "non-admin cannot update enabled family currencies" do

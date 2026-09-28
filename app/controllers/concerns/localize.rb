@@ -20,8 +20,11 @@ module Localize
       locale_sym if I18n.available_locales.include?(locale_sym)
     end
 
+    # The primary ledger rather than the active one, so switching ledgers never
+    # changes the interface language. Timezone, by contrast, follows the active
+    # ledger: it decides which day that ledger's transactions fall on.
     def locale_from_family
-      locale = Current.family&.locale
+      locale = (Current.user&.family || Current.family)&.locale
       return if locale.blank?
 
       locale_sym = locale.to_sym

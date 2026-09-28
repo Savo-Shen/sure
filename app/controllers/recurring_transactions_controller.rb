@@ -2,6 +2,7 @@
 # create paths, editable identity and frequency, suggestion confirm/dismiss, and
 # schedule pinning on a hand-set cadence.
 class RecurringTransactionsController < ApplicationController
+  require_ledger_editor_for_writes
   include RecurringFeatureGuardable
 
   layout "settings"

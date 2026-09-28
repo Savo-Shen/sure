@@ -2,6 +2,7 @@ class SessionsController < ApplicationController
   extend SslConfigurable
 
   before_action :set_session, only: :destroy
+  skip_before_action :reject_stale_ledger_write, only: :destroy
   skip_authentication only: %i[index new create openid_connect failure post_logout mobile_sso_start desktop_sso_start desktop_exchange]
   # The desktop exchange is a cross-context POST from the app's webview that
   # can't carry a CSRF token; the single-use, PKCE-bound one-time code is the

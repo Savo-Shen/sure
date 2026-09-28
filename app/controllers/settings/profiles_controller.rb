@@ -35,7 +35,9 @@ class Settings::ProfilesController < ApplicationController
       return
     end
 
-    if @user.destroy
+    # purge, not destroy: it also cleans up ledgers only this user belonged to
+    # and hands their accounts to the next most privileged member.
+    if @user.purge
       # Also destroy the invitation associated with this user for this family
       Current.family.invitations.find_by(email: @user.email)&.destroy
       flash[:notice] = t(".member_removed")

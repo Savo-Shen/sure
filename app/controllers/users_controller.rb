@@ -12,6 +12,7 @@ class UsersController < ApplicationController
 
   def update
     @user = Current.user
+    return redirect_back_or_to(settings_preferences_path, alert: t("shared.ledger_switched")) if stale_ledger_form?
     return if admin_family_change_requested? && !ensure_admin
 
     if email_changed?
@@ -128,8 +129,12 @@ class UsersController < ApplicationController
     end
 
     def user_params
-      family_attrs = [ :name, :currency, :country, :date_format, :timezone, :locale, :month_start_day, :id ]
+      # Viewers are read-only in the ledger; renaming it or changing its
+      # currency affects everyone, so those need admin.
+      family_attrs = [ :id ]
+      family_attrs.push(:country, :date_format, :timezone, :locale, :month_start_day) if Current.user.member?
       if Current.user.admin?
+        family_attrs.push(:name, :currency)
         family_attrs.push(:personal_budgets, :household_budget_enabled) # Needed for updating existing family
         family_attrs.push(:moniker, :default_account_sharing)
         family_attrs << { enabled_currencies: [] }
@@ -145,6 +150,13 @@ class UsersController < ApplicationController
 
     def set_user
       @user = Current.user
+    end
+
+    # Ledger forms carry the id of the ledger they were rendered for; after a
+    # switch in another tab that is no longer Current.family.
+    def stale_ledger_form?
+      form_family_id = params.dig(:user, :family_attributes, :id).presence
+      form_family_id.present? && form_family_id != Current.family.id
     end
 
     def admin_family_change_requested?

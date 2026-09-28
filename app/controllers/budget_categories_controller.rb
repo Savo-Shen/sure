@@ -1,4 +1,5 @@
 class BudgetCategoriesController < ApplicationController
+  require_ledger_editor_for_writes
   include BudgetOwnership
 
   before_action :set_budget

@@ -1,4 +1,5 @@
 class CategoriesController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :set_category, only: %i[edit update destroy]
   before_action :set_categories, only: %i[update edit]
   before_action :set_transaction, only: :create

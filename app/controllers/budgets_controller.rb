@@ -1,4 +1,5 @@
 class BudgetsController < ApplicationController
+  require_ledger_editor_for_writes
   include BudgetOwnership
 
   before_action :set_budget, only: %i[show edit update copy_previous]

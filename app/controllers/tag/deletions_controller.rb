@@ -1,4 +1,5 @@
 class Tag::DeletionsController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :set_tag
   before_action :set_replacement_tag, only: :create
 

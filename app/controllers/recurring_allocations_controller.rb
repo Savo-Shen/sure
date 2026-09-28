@@ -1,4 +1,5 @@
 class RecurringAllocationsController < ApplicationController
+  require_ledger_editor_for_writes
   include RecurringFeatureGuardable
 
   before_action :ensure_recurring_enabled

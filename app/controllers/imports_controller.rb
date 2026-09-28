@@ -1,6 +1,7 @@
 class ImportsController < ApplicationController
   include SettingsHelper
 
+  before_action :require_ledger_editor!, only: %i[new create]
   before_action :set_import, only: %i[show update publish destroy revert apply_template cancel summary]
   before_action :require_statement_import_permission!, only: %i[update publish destroy revert apply_template cancel]
 

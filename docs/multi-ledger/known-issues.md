@@ -181,12 +181,15 @@
 - 孤儿账本：`User#purge` 会先删除只剩该用户一个成员的非主账本。
 - 后台删除账本改查 `family_memberships`；洞察生成、归档邮箱改用 `family.members`。
 
-需要手动执行：`bin/rails db:migrate`（新增 `chats.family_id`）。
+迁移：本地开发库已于 2026-09-28 执行 `20260928130000_add_family_to_chats`，同时删除了旧版 membership 迁移留下的两个多余单列索引。
 
-需要决定（Phase 4 角色矩阵之前）：
+已决定（2026-09-28）：
 
-- [ ] super_admin 在加入的账本里的权限。建议：账本内权限只看 membership，super_admin 只用于 `/admin`。
-- [ ] 角色的事实源：`users.role` 和 membership 的角色。建议：以 membership 为准，`users.role` 只作为兼容字段，从主账本 membership 反推，不再反向覆盖。
+- [x] super_admin 在加入的每个账本里都拥有全部角色权限：`admin?`、`member?` 都返回 true，默认共享也总是 read_write。账户是否可见仍由账户共享决定，不会绕过别人的私有账户。
+- [x] 角色以 membership 为准。`users.role` 只是主账本 membership 的粗粒度投影（owner/admin→admin，editor→member，viewer→guest）：
+  - 主账本 membership 的角色变化会写回 `users.role`（super_admin 除外）。
+  - `users.role` 变化时，只有粗粒度等级真的变了才改 membership，所以 SSO 同步或后台改成同一等级时，`admin` 不会再被改成 `owner`。
+  - 移入一个已有 membership 的账本时，`users.role` 跟随这个 membership。
 
 延后：
 
@@ -194,3 +197,97 @@
 - [ ] UI 模式按账本走：目前只解决了切换器入口的问题，`ui_layout` 仍然跟用户走，和角色矩阵一起做。
 - [ ] 移除非主账本成员、最后一个 owner 的保护：放到 5e。
 - [ ] Demo 数据生成器：影响不大，暂不处理。
+
+## 第三轮评审（2026-09-28，基于 `99e9f78` 和工作区未提交改动）
+
+第二轮标为已修的项目逐条核对过，代码与"第二轮处理记录"一致。完整测试（含工作区改动）：10096 个，0 失败，0 错误；改动过的 Ruby 文件 rubocop 无问题；两个迁移在本地已执行。
+
+下面的问题用临时集成测试复现过（已删除）：
+
+| 场景 | 结果 |
+|---|---|
+| 标签页 1 停在 A 的偏好设置，标签页 2 切到 B，然后在标签页 1 改币种为 EUR | B 被改成 EUR，A 不变 |
+| B 的 viewer 在偏好设置里改账本名称和币种 | 成功（名称被改、币种变 JPY） |
+| B 的 viewer 新建分类、标签 | 成功 |
+| 用户从 A 移到 B，再以 viewer 身份重新加入 A | A 里留下 2 条旧共享；重新加入后旧共享仍是 `read_write` |
+
+### 高
+
+- [x] **多标签页写错账本。** 当前账本存在 session 里，所有标签页共用。`UsersController#update_user_and_ledger` 用 `ledger_attrs.except(:id)` 丢掉了表单里的账本 id，直接写 `Current.family`。偏好设置是自动提交表单，在旧标签页里改一下就会写进另一个账本。
+  - 修法：`family_attributes[:id]` 存在且不等于 `Current.family.id` 时拒绝（提示"账本已切换，请刷新"）。
+  - 同一问题的一般形式：旧标签页里的新建表单（分类、标签、规则、预算等不带 id 的资源）会建到新账本。可以在布局里输出当前账本 id，让表单和 Turbo 请求带上（隐藏字段或请求头），在 `ApplicationController` 里对非 GET 请求统一比对。
+- [x] **viewer 可以修改账本数据。** 除 admin 专属字段外，`user_params` 对所有角色都放行 `name`、`currency`、`country`、`date_format`、`timezone`、`locale`、`month_start_day`；分类、标签等账本级资源的控制器也没有角色校验。上游的 guest 本来就能这样做，但在多账本里 viewer 就是"只读受邀者"，这就成了越权。
+  - 修法：账本设置字段至少要求 editor（货币、名称建议要求 admin）；给账本级资源的写操作加一个统一的 `require_ledger_editor`，按控制器列白名单。
+- [x] **移出账本后共享权限残留。** `sync_primary_family_membership` 删除旧 membership 时，不删这个人在旧账本里的 `AccountShare`（`BudgetShare` 同理）。现在因为有 `Current.family` 的账本过滤，不会越权；但重新加入时旧共享会恢复，`auto_share_existing_accounts_with` 也不会覆盖已有记录，所以以 viewer 身份重新加入的人仍然有写权限。
+  - 修法：`FamilyMembership` 的 `after_destroy` 里删除该用户在该账本的 `AccountShare` 和 `BudgetShare`，再补一个"移出后重新加入"的测试。
+
+### 中
+
+- [ ] **跨账本链接返回 404。** 邮件、推送、收藏的链接如果指向非当前账本的资源，会返回 404。可以在 `RecordNotFound` 时检查资源所属账本：如果用户是成员，就提示切换（或自动切换）。
+- [ ] **只能用主账本的入口。** API、MCP（`app/controllers/mcp_controller.rb:169`）和 API key 导出（`app/controllers/reports_controller.rb:1144`）都新建 session，所以固定用主账本。推送通知可能来自账本 B 的洞察，但移动端通过 API 打开时找不到这条洞察。之前已列入延后，这里补充 MCP、导出和推送三个具体入口。
+- [x] **成员页删除用户不走 purge。** `Settings::ProfilesController#destroy` 直接调用 `@user.destroy`，不会执行 `destroy_sole_member_secondary_ledgers!`，被删用户独占的非主账本会成为孤儿。后台删除（`permanently_remove!` → `purge_later`）没有这个问题。
+- [x] **语言和时区跟随账本。** `Localize` 在用户没设语言时退回 `Current.family.locale`，时区也取当前账本的。两个账本设置不同时，切换账本会改变界面语言和日期边界。需要确认这是否符合预期；如果不是，界面语言应以用户设置为准。
+- [ ] **邀请仍是"移动"语义**（已计划为 5b）。在它完成之前，产品里仍然没有路径能让一个人同时属于两个账本。
+
+### 工作区未提交改动（角色事实源、super_admin）的评审
+
+这批改动选择了"membership 为事实源、super_admin 在所有加入的账本里拥有全部权限"。逻辑检查结果：
+
+- 没有回调死循环：`project_role_onto_user` → `user.update!(role:)` → `sync_primary_family_membership`，第二步会因为"旧角色层级相同"而跳过，所以不会循环。
+- [x] 缺少测试：没有新增测试覆盖这些情况：主账本 membership 改角色会同步 `users.role`；SSO 同步到 `admin` 时保留 membership 的 `admin` 角色，不会被提升为 `owner`；super_admin 以 viewer 身份加入时拿到 `read_write` 共享。
+- [x] 副作用：`project_role_onto_user` 用的是 `user.update!`，会触发 User 的全部校验和 `apply_role_based_ui_defaults`。把主账本 membership 降为 viewer，会把这个人切换到 intro 布局；如果 user 记录因为其他原因校验失败，membership 的保存也会抛异常。
+- [x] 不一致：移入已有 membership 的账本时，用 `update_column(:role, ...)` 回写 `users.role`，这会跳过 `apply_role_based_ui_defaults`。结果是同样变成 guest，走这条路径的人不会切到 intro 布局，走邀请路径的人会。
+- super_admin 的决定：super_admin 以 viewer 身份加入别人的账本，也能写入和修改设置，而且账本 owner 在成员列表里只能看到"viewer"。这和第二轮的建议相反；如果坚持这样，建议在成员列表里标明 super_admin。
+
+### 低
+
+- [x] 调试日志的账本归属：`app/models/chat.rb:246`、`app/models/assistant/responder.rb:113`、`app/models/push_subscription/delivery.rb:44` 仍用 `user.family`，在账本 B 里出错时日志会记到 A。前两处可以改为 `chat.family`。
+- [ ] 默认账户只有一个：`default_account_for_transactions` 只在当前账本生效，所以在 B 里默认账户总是空的。以后可以按账本存。
+- [x] 被移出账本后，这个人在该账本的聊天记录仍留在库里（但本人和其他成员都看不到）。需要决定是删除，还是随 membership 一起清理。
+
+## 第三轮处理记录（2026-09-28）
+
+逐条核实，上面列出的问题都存在。已修复：
+
+- 多标签页写错账本：
+  - 布局 `<head>` 输出 `<meta name="active-family-id">`。`application.js` 在 Turbo 的非 GET 请求上带 `X-Active-Family-Id` 请求头。
+  - `ApplicationController#reject_stale_ledger_write` 发现请求头和 `Current.family` 不一致时拒绝写入：HTML 重定向并提示"已在其他标签页切换账本"，JSON 返回 409。
+  - 账本切换（`FamiliesController`）和退出登录不做这个检查，旧标签页仍然可以切换账本或退出。
+  - 偏好设置额外比对表单里的 `family_attributes[:id]`，不带请求头的普通表单提交也能拦住。
+  - 旧标签页的新建表单（分类、标签等）同样会被请求头拦住。
+- viewer 写权限：
+  - 偏好设置：viewer 只能改个人字段；editor 可以改 `country/date_format/timezone/locale/month_start_day`；`name/currency` 和原有 admin 字段需要 admin。
+  - 新增 `require_ledger_editor_for_writes`（GET 的 `new/edit` 也会拦）。已用在分类、标签、商户、规则、预算、预算分类、周期交易/分配/实例、目标、目标认捐、账单（含 AI 审阅、智能配置、smart fill）、分类/标签删除。
+  - 新建账户（`AccountableResource`）和导入的 `new/create` 也要求 editor。
+  - 已有账户和交易的编辑仍由 `AccountShare` 权限控制，viewer 默认拿到的是 `read_only`。
+- 移出账本后的残留：`FamilyMembership` 的 `after_destroy :revoke_ledger_access` 会删除：
+  - 该用户在该账本的 `AccountShare`。
+  - 该用户在该账本的聊天，所以"聊天记录留在库里"也一并处理了。
+  - 与已经不再同属任何账本的人之间的 `BudgetShare`。
+  - 已补测试：以 viewer 身份重新加入后，共享是 `read_only`。
+- 成员页删除用户：改为调用 `@user.purge`，独占的非主账本会一起删除。
+- 语言：`Localize` 退回时先用用户主账本的 locale，切换账本不会再改变界面语言。时区仍然跟随当前账本：日期边界、预算月份是账本的数据属性，应以账本为准。
+- 移入已有 membership 的账本：
+  - 去掉了 `update_column` 回写，改为 `before_validation :adopt_destination_membership_role`。它在 `apply_role_based_ui_defaults` 之前把 `users.role` 设为目标 membership 的投影，所以和邀请路径一样会切到 intro 布局。
+  - 已补测试。
+- super_admin 标识：`FamilyMembership#legacy_role` 对 super_admin 返回 `super_admin`，成员列表会显示"超级管理员"，不再显示成 viewer。
+- 调试日志：`Chat` 和 `Assistant::Responder` 改用 `chat.family`。`PushSubscription::Delivery` 保持 `user.family`，因为推送订阅属于用户，不属于账本。
+
+复核后不改：
+
+- "缺少测试"：这三个场景的测试已经在 `e60b7ad` 的 `test/models/user_membership_test.rb` 里（投影回写、同级保留 admin、super_admin 以 viewer 加入拿到 read_write）。
+- `project_role_onto_user` 用 `update!`：这是有意的。改角色会同步走 UI 默认值，和其他改角色的路径一致；user 校验失败时，整个事务回滚，比悄悄写出不一致的数据好。
+
+延后：
+
+- [ ] 跨账本链接 404 时提示或自动切换。
+- [ ] API、MCP、API key 导出、推送打开只能用主账本（和 5c 一起做）。
+- [ ] 邀请的"加入"语义（5b）。
+- [ ] 默认账户按账本存。
+
+验证：
+
+- 完整测试：10108 个，0 失败，0 错误。`api/v1` 的 chats、messages 两个测试原先先把 `family_member` 移出账本，再改写他在旧账本的聊天；现在移出时这些聊天已被删除，所以改为在新账本里新建聊天。
+- rubocop（32 个改动文件）、erb_lint、brakeman 都没有问题。
+- Biome：本地没有安装 `node_modules`，没有运行。
+- 请求头的前端逻辑没有在浏览器里实测：按仓库约定不启动 `rails server`。服务端的拦截已由集成测试覆盖。

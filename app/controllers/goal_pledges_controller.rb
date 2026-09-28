@@ -1,4 +1,5 @@
 class GoalPledgesController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :require_preview_features!
   before_action :set_goal
   before_action :set_pledge, only: %i[renew destroy]

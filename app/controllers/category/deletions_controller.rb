@@ -1,4 +1,5 @@
 class Category::DeletionsController < ApplicationController
+  require_ledger_editor_for_writes
   before_action :set_category
   before_action :set_replacement_category, only: :create
 

@@ -1,4 +1,5 @@
 class Bills::AiReviewsController < ApplicationController
+  require_ledger_editor_for_writes
   include BillsHelper
   include RecurringFeatureGuardable
 

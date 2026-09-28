@@ -93,8 +93,7 @@ class Api::V1::MessagesControllerTest < ActionDispatch::IntegrationTest
   test "should not access messages in other user's chat" do
     other_user = users(:family_member)
     other_user.update!(family: families(:empty))
-    other_chat = chats(:two)
-    other_chat.update!(user: other_user)
+    other_chat = Chat.create!(user: other_user, family: families(:empty), title: "Other chat")
 
     post "/api/v1/chats/#{other_chat.id}/messages",
       params: { content: "Test" },

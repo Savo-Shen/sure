@@ -68,6 +68,17 @@ class UserMembershipTest < ActiveSupport::TestCase
     assert_equal "admin", @member.reload.role, "users.role follows the existing membership"
   end
 
+  test "moving into a ledger as an existing viewer applies the guest layout like any demotion" do
+    FamilyMembership.create!(user: @member, family: @other_family, role: "viewer")
+
+    @member.update!(family: @other_family)
+
+    @member.reload
+    assert_equal "guest", @member.role
+    assert @member.ui_layout_intro?
+    assert_equal "viewer", @member.role_in(@other_family)
+  end
+
   test "changing a primary membership role projects onto users.role" do
     @admin.membership_for(@family).update!(role: "viewer")
     assert_equal "guest", @admin.reload.role
@@ -108,6 +119,27 @@ class UserMembershipTest < ActiveSupport::TestCase
 
     @admin.update!(role: "guest")
     assert_equal "viewer", @admin.role_in(@family)
+  end
+
+  test "leaving a ledger drops the access held there and a viewer rejoin stays read-only" do
+    account = @family.accounts.where.not(owner_id: @member.id).first
+    AccountShare.where(account: account, user: @member).delete_all
+    AccountShare.create!(account: account, user: @member, permission: "read_write")
+    BudgetShare.where(owner: @admin, viewer: @member).delete_all
+    BudgetShare.create!(owner: @admin, viewer: @member, permission: "read_write")
+    chat = Chat.create!(user: @member, family: @family, title: "Old ledger chat")
+
+    @member.update!(family: @other_family)
+
+    assert_not AccountShare.exists?(account: account, user: @member)
+    assert_not BudgetShare.exists?(owner: @admin, viewer: @member)
+    assert_not Chat.exists?(chat.id)
+
+    @family.update!(default_account_sharing: "shared")
+    FamilyMembership.create!(user: @member, family: @family, role: "viewer")
+    @family.auto_share_existing_accounts_with(@member)
+
+    assert_equal "read_only", AccountShare.find_by(account: account, user: @member).permission
   end
 
   test "moving primary family revokes the membership in the old ledger" do

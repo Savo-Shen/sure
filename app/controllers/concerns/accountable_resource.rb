@@ -4,6 +4,7 @@ module AccountableResource
   included do
     include Periodable, StreamExtensions
 
+    before_action :require_ledger_editor!, only: %i[new create]
     before_action :set_account, only: [ :show ]
     before_action :set_manageable_account, only: [ :edit, :update ]
     before_action :set_link_options, only: :new

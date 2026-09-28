@@ -184,8 +184,8 @@ class ImportsControllerTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert_redirected_to new_import_url
-    assert_equal I18n.t("accounts.not_authorized"), flash[:alert]
+    assert_redirected_to root_url
+    assert_equal I18n.t("shared.require_ledger_editor"), flash[:alert]
   end
 
   test "duplicate pdf import reuses account statement" do

@@ -1,4 +1,5 @@
 class BillsController < ApplicationController
+  require_ledger_editor_for_writes
   include RecurringFeatureGuardable
 
   # What the All-bills status filter offers: payment state, plus the two

@@ -1,4 +1,5 @@
 class RulesController < ApplicationController
+  require_ledger_editor_for_writes
   include StreamExtensions
 
   before_action :set_rule, only: [  :edit, :update, :destroy, :apply, :confirm ]

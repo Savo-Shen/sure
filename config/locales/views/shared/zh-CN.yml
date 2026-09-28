@@ -21,6 +21,8 @@ zh-CN:
     syncing_notice:
       syncing: 账户数据同步中……
     require_admin: 只有管理员才能执行此操作
+    require_ledger_editor: 查看者不能修改此账本
+    ledger_switched: 你已在其他标签页切换了账本，本次修改未保存；页面已刷新为当前账本。
     custom_confirm:
       default_title: 确定吗？
       default_body: 此操作不可逆。
