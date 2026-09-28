@@ -65,6 +65,35 @@ class UserMembershipTest < ActiveSupport::TestCase
 
     assert_equal "admin", invite_role_membership.reload.role
     assert_equal 1, @member.family_memberships.where(family: @other_family).count
+    assert_equal "admin", @member.reload.role, "users.role follows the existing membership"
+  end
+
+  test "changing a primary membership role projects onto users.role" do
+    @admin.membership_for(@family).update!(role: "viewer")
+    assert_equal "guest", @admin.reload.role
+
+    @admin.membership_for(@family).update!(role: "admin")
+    assert_equal "admin", @admin.reload.role
+  end
+
+  test "a legacy role change within the same coarse level keeps the membership role" do
+    @admin.membership_for(@family).update!(role: "admin")
+
+    @admin.update!(role: "super_admin")
+
+    assert_equal "admin", @admin.reload.role_in(@family)
+  end
+
+  test "super_admin holds every role in a ledger they joined as a viewer" do
+    super_admin = users(:sure_support_staff)
+    membership = FamilyMembership.create!(user: super_admin, family: @family, role: "viewer")
+    session = super_admin.sessions.create!
+    session.switch_active_family!(@family)
+    Current.session = session
+
+    assert super_admin.admin?
+    assert super_admin.member?
+    assert_equal "read_write", membership.default_share_permission
   end
 
   test "destroying a user destroys their memberships" do

@@ -9,6 +9,10 @@ class FamilyMembership < ApplicationRecord
 
   validates :user_id, uniqueness: { scope: :family_id }
 
+  # The membership is the source of truth for roles; users.role mirrors the
+  # primary ledger's membership in the legacy vocabulary.
+  after_save :project_role_onto_user, if: -> { saved_change_to_role? && primary? }
+
   # role is a string column, so SQL ordering on it is alphabetical rather than
   # privilege order. This CASE restores owner > admin > editor > viewer for the
   # few places that must pick "the most privileged member" in the query layer.
@@ -39,6 +43,10 @@ class FamilyMembership < ApplicationRecord
     end
   end
 
+  def self.same_legacy_level?(role_a, role_b)
+    legacy_role_for(role_a) == legacy_role_for(role_b)
+  end
+
   # True when +actual+ is at least as privileged as +minimum+, e.g.
   # role_at_least?("admin", "editor") == true. Works on strings so it can
   # answer for a role the record doesn't currently hold.
@@ -62,4 +70,18 @@ class FamilyMembership < ApplicationRecord
   def primary?
     user.family_id == family_id
   end
+
+  # super_admin holds every role in every ledger, so never gets a read-only share.
+  def default_share_permission
+    viewer? && !user.super_admin? ? "read_only" : "read_write"
+  end
+
+  private
+
+    def project_role_onto_user
+      return if user.super_admin?
+
+      legacy = self.class.legacy_role_for(role)
+      user.update!(role: legacy) unless user.role == legacy
+    end
 end

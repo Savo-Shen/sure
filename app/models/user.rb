@@ -169,11 +169,11 @@ class User < ApplicationRecord
 
   # Role predicates resolve against the user's membership in the ACTIVE ledger
   # (Current.family): a viewer of a shared ledger keeps viewer powers there
-  # even when they own their own ledger. super_admin stays instance-level.
-  # Outside a request (jobs, mailers) Current.family is nil and the legacy
-  # users.role column answers instead, preserving pre-multi-ledger behavior.
+  # even when they own their own ledger. super_admin holds every role in every
+  # ledger they belong to. Outside a request (jobs, mailers) Current.family is
+  # nil and the legacy users.role column answers instead.
   def admin?
-    super_admin? || active_ledger_role_at_least?("admin")
+    active_ledger_role_at_least?("admin")
   end
 
   def member?
@@ -764,6 +764,8 @@ class User < ApplicationRecord
     # fallback, so code running without a request context behaves exactly as
     # it did before memberships existed.
     def active_ledger_role_at_least?(minimum)
+      return true if super_admin?
+
       membership = membership_for(Current.family)
 
       if membership
@@ -777,22 +779,31 @@ class User < ApplicationRecord
       membership_for(family)&.role || FamilyMembership.role_for_legacy_role(role)
     end
 
+    # Memberships are the source of truth; users.role is only a coarse
+    # projection of the primary one. A users.role change rewrites the
+    # membership only when that coarse level really changed, so e.g. an SSO
+    # sync to "admin" leaves an "admin" membership alone instead of promoting
+    # it to "owner".
     def sync_primary_family_membership
       return if family_id.blank?
 
-      if saved_change_to_family_id?
-        # A family_id change is a MOVE: keep an existing membership's role in
-        # the destination (an invitation may have set it) and revoke the old
-        # ledger, otherwise the switcher would still let the user back in.
-        family_memberships.find_or_initialize_by(family_id: family_id) do |membership|
-          membership.role = FamilyMembership.role_for_legacy_role(role)
-        end.save!
+      desired_role = FamilyMembership.role_for_legacy_role(role)
+      membership = family_memberships.find_or_initialize_by(family_id: family_id)
 
-        previous_family_id = family_id_before_last_save
-        family_memberships.where(family_id: previous_family_id).destroy_all if previous_family_id.present?
-      else
-        family_memberships.find_or_initialize_by(family_id: family_id)
-          .update!(role: FamilyMembership.role_for_legacy_role(role))
+      if membership.new_record?
+        membership.update!(role: desired_role)
+      elsif saved_change_to_role?
+        membership.update!(role: desired_role) unless FamilyMembership.same_legacy_level?(membership.role, desired_role)
+      elsif !super_admin? && !FamilyMembership.same_legacy_level?(membership.role, desired_role)
+        # Moved into a ledger where an existing membership (e.g. from an
+        # invitation) already defines the role.
+        update_column(:role, FamilyMembership.legacy_role_for(membership.role))
+      end
+
+      # A family_id change is a MOVE: revoke the old ledger, otherwise the
+      # switcher would still let the user back in.
+      if saved_change_to_family_id? && family_id_before_last_save.present?
+        family_memberships.where(family_id: family_id_before_last_save).destroy_all
       end
 
       family_memberships.reset

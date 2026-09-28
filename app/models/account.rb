@@ -712,9 +712,9 @@ class Account < ApplicationRecord
     # Viewers get read_only, everyone else read_write. This mirrors
     # Family#auto_share_existing_accounts_with so a viewer's permission on an
     # account is the same whether they joined before or after it was created.
-    records = family.family_memberships.where.not(user_id: owner_id).map do |membership|
+    records = family.family_memberships.where.not(user_id: owner_id).includes(:user).map do |membership|
       { account_id: id, user_id: membership.user_id,
-        permission: membership.viewer? ? "read_only" : "read_write",
+        permission: membership.default_share_permission,
         include_in_finances: true, created_at: Time.current, updated_at: Time.current }
     end
 

@@ -407,7 +407,7 @@ class Family < ApplicationRecord
     membership = membership_for(user)
     return unless membership
 
-    permission = membership.viewer? ? "read_only" : "read_write"
+    permission = membership.default_share_permission
     records = accounts.where.not(owner_id: user.id).pluck(:id).map do |account_id|
       { account_id: account_id, user_id: user.id, permission: permission,
         include_in_finances: true, created_at: Time.current, updated_at: Time.current }
