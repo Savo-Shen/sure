@@ -285,6 +285,104 @@ class ActiveStorageAuthorizationTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "user can access their own family export blob" do
+    export = FamilyExport.create!(family: @user_a.family)
+    export.export_file.attach(
+      io: StringIO.new("Family A Export"),
+      filename: "export.zip",
+      content_type: "application/zip"
+    )
+
+    sign_in @user_a
+
+    get rails_blob_path(export.export_file)
+    assert_response :redirect
+    follow_redirect!
+    assert_response :success
+    assert_match(/rails\/active_storage\/disk/, request.path)
+  end
+
+  test "user cannot access family export blob from a different family" do
+    export = FamilyExport.create!(family: @user_a.family)
+    export.export_file.attach(
+      io: StringIO.new("Family A Export"),
+      filename: "export.zip",
+      content_type: "application/zip"
+    )
+
+    sign_in @user_b
+
+    get rails_blob_path(export.export_file)
+
+    assert_response :not_found
+  end
+
+  test "user cannot access sure import blob from a different family" do
+    import = SureImport.create!(family: @user_a.family)
+    import.ndjson_file.attach(
+      io: StringIO.new('{"type":"Account","data":{}}'),
+      filename: "import.ndjson",
+      content_type: "application/x-ndjson"
+    )
+
+    sign_in @user_b
+
+    get rails_blob_path(import.ndjson_file)
+
+    assert_response :not_found
+  end
+
+  test "user cannot access family document blob from a different family" do
+    document = FamilyDocument.create!(family: @user_a.family, filename: "doc.pdf", status: "ready")
+    document.file.attach(
+      io: StringIO.new("Family A Document"),
+      filename: "doc.pdf",
+      content_type: "application/pdf"
+    )
+
+    sign_in @user_b
+
+    get rails_blob_path(document.file)
+
+    assert_response :not_found
+  end
+
+  test "account sharee can access transaction attachment within the same family" do
+    transaction = transactions(:transfer_in) # on the credit card shared with family_member
+    transaction.attachments.attach(
+      io: StringIO.new("Shared Receipt"),
+      filename: "receipt.pdf",
+      content_type: "application/pdf"
+    )
+
+    sign_in users(:family_member)
+
+    get rails_blob_path(transaction.attachments.first)
+
+    assert_response :redirect
+    follow_redirect!
+    assert_response :success
+    assert_match(/rails\/active_storage\/disk/, request.path)
+  end
+
+  test "family member without account access cannot read transaction attachment" do
+    entry = accounts(:other_asset).entries.create!(
+      name: "Private", date: Date.current, amount: -10, currency: "USD",
+      entryable: Transaction.new
+    )
+    entry.entryable.attachments.attach(
+      io: StringIO.new("Private Receipt"),
+      filename: "receipt.pdf",
+      content_type: "application/pdf"
+    )
+
+    sign_in users(:family_member)
+
+    get rails_blob_path(entry.entryable.attachments.first)
+
+    assert_response :not_found
+  end
+
   private
 
     def sign_out(user)

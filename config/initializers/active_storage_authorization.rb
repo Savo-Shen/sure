@@ -2,7 +2,17 @@
 Rails.application.config.to_prepare do
   module ActiveStorageAttachmentAuthorization
     extend ActiveSupport::Concern
-    PROTECTED_RECORD_TYPES = %w[Transaction AccountStatement].freeze
+    # Transaction and AccountStatement have bespoke checks below. The remaining
+    # protected types all belong_to :family and share the family-scoped check:
+    # Import covers the SureImport/PdfImport STI attachments, which store the
+    # base-class name as record_type. Anything else in the whitelist fails
+    # closed in `protected_attachment_authorized?` without loading the record,
+    # so a stale/unknown record_type can never bypass authorization.
+    # ArchivedExport is deliberately excluded: it has no family (the family is
+    # deleted before archiving) and is served through the token-authenticated
+    # ArchivedExportsController instead.
+    FAMILY_SCOPED_RECORD_TYPES = %w[Import FamilyExport FamilyDocument].freeze
+    PROTECTED_RECORD_TYPES = (FAMILY_SCOPED_RECORD_TYPES + %w[Transaction AccountStatement]).freeze
 
     included do
       include Authentication
@@ -32,6 +42,8 @@ Rails.application.config.to_prepare do
           transaction_attachment_authorized?(attachment)
         when "AccountStatement"
           account_statement_attachment_authorized?(attachment)
+        when *FAMILY_SCOPED_RECORD_TYPES
+          family_scoped_attachment_authorized?(attachment)
         else
           false
         end
@@ -41,7 +53,24 @@ Rails.application.config.to_prepare do
         transaction = attachment.record
         return false if transaction.nil?
 
-        Current.family == transaction.entry.account.family
+        account = transaction.entry.account
+        return false unless Current.family == account.family
+
+        # Cross-ledger access is blocked by the family check above; this also
+        # enforces intra-ledger account shares (a shared account's transactions
+        # are only visible to users the account is shared with).
+        Current.family.accounts.accessible_by(Current.user).exists?(account.id)
+      rescue ActiveRecord::RecordNotFound, NoMethodError
+        false
+      end
+
+      # Import (SureImport/PdfImport), FamilyExport and FamilyDocument all
+      # belong_to :family — the record's family must be the user's active ledger.
+      def family_scoped_attachment_authorized?(attachment)
+        record = attachment.record
+        return false if record.nil?
+
+        record.family == Current.family
       rescue ActiveRecord::RecordNotFound, NoMethodError
         false
       end
