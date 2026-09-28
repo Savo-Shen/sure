@@ -43,6 +43,8 @@ class Family < ApplicationRecord
   SHARING_DEFAULTS = %w[shared private].freeze
 
   has_many :users, dependent: :destroy
+  has_many :family_memberships, dependent: :destroy
+  has_many :members, through: :family_memberships, source: :user
   has_many :accounts, dependent: :destroy
   has_many :invitations, dependent: :destroy
 
@@ -348,6 +350,18 @@ class Family < ApplicationRecord
 
   def share_all_by_default?
     default_account_sharing == "shared"
+  end
+
+  def membership_for(user)
+    family_memberships.find_by(user: user)
+  end
+
+  def member?(user)
+    membership_for(user).present?
+  end
+
+  def owners
+    family_memberships.select(&:owner?).map(&:user)
   end
 
   # Shares every existing account in this family (except ones the user already

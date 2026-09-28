@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_25_220151) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -897,6 +897,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_220151) do
     t.index ["family_id"], name: "index_family_exports_on_family_id"
   end
 
+  create_table "family_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "family_id", null: false
+    t.string "role", default: "editor", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["family_id", "user_id"], name: "index_family_memberships_on_family_id_and_user_id"
+    t.index ["family_id"], name: "index_family_memberships_on_family_id"
+    t.index ["user_id", "family_id"], name: "index_family_memberships_on_user_id_and_family_id", unique: true
+    t.index ["user_id"], name: "index_family_memberships_on_user_id"
+    t.check_constraint "role::text = ANY (ARRAY['owner'::character varying, 'admin'::character varying, 'editor'::character varying, 'viewer'::character varying]::text[])", name: "chk_family_memberships_role_enum"
+  end
+
   create_table "family_merchant_associations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "family_id", null: false
@@ -918,7 +931,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_220151) do
     t.index ["account_id"], name: "index_financekit_account_lineages_on_account_id"
     t.index ["family_id", "account_id"], name: "financekit_lineage_canonical_account", unique: true, where: "(account_id IS NOT NULL)"
     t.index ["family_id"], name: "index_financekit_account_lineages_on_family_id"
-    t.check_constraint "account_origin IS NULL OR (account_origin::text = ANY (ARRAY['created'::character varying, 'linked'::character varying]::text[]))", name: "financekit_lineage_account_origin"
+    t.check_constraint "account_origin IS NULL OR (account_origin::text = ANY (ARRAY['created'::character varying::text, 'linked'::character varying::text]))", name: "financekit_lineage_account_origin"
   end
 
   create_table "financekit_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -2969,6 +2982,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_220151) do
   add_foreign_key "eval_samples", "eval_datasets"
   add_foreign_key "family_documents", "families"
   add_foreign_key "family_exports", "families"
+  add_foreign_key "family_memberships", "families"
+  add_foreign_key "family_memberships", "users"
   add_foreign_key "family_merchant_associations", "families"
   add_foreign_key "family_merchant_associations", "merchants"
   add_foreign_key "financekit_account_lineages", "accounts", on_delete: :nullify

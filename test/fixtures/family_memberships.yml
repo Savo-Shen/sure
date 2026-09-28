@@ -1,0 +1,54 @@
+# Memberships mirror the users fixture so fixture-loaded users behave like
+# production users after the CreateFamilyMemberships backfill (fixtures are
+# inserted directly and skip the User model's sync hook).
+# Role mapping: guest -> viewer, member -> editor, admin/super_admin -> owner.
+
+empty_user_one:
+  user: empty
+  family: empty
+  role: owner
+
+sure_support_staff:
+  user: sure_support_staff
+  family: empty
+  role: owner
+
+family_admin:
+  user: family_admin
+  family: dylan_family
+  role: owner
+
+family_member:
+  user: family_member
+  family: dylan_family
+  role: editor
+
+new_email:
+  user: new_email
+  family: empty
+  role: editor
+
+intro_user:
+  user: intro_user
+  family: empty
+  role: viewer
+
+inactive_trial_user:
+  user: inactive_trial_user
+  family: inactive_trial
+  role: owner
+
+sso_only:
+  user: sso_only
+  family: empty
+  role: editor
+
+josh:
+  user: josh
+  family: empty
+  role: editor
+
+ann:
+  user: ann
+  family: empty
+  role: editor

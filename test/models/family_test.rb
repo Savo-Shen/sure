@@ -7,6 +7,18 @@ class FamilyTest < ActiveSupport::TestCase
     @syncable = families(:dylan_family)
   end
 
+  test "memberships expose members with roles" do
+    family = families(:dylan_family)
+    admin = users(:family_admin)
+    member = users(:family_member)
+
+    assert family.member?(admin)
+    assert family.member?(member)
+    assert_not family.member?(users(:empty))
+    assert_equal [ admin ], family.owners
+    assert_equal "editor", family.membership_for(member).role
+  end
+
   test "investment_contributions_category creates category when missing" do
     family = families(:dylan_family)
     family.categories.where(name: Category.investment_contributions_name).destroy_all

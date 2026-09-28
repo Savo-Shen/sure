@@ -22,6 +22,8 @@ class User < ApplicationRecord
   end
 
   belongs_to :family
+  has_many :family_memberships, dependent: :destroy
+  has_many :families, through: :family_memberships
   belongs_to :last_viewed_chat, class_name: "Chat", optional: true
   belongs_to :default_account, class_name: "Account", optional: true
   has_many :sessions, dependent: :destroy
@@ -76,6 +78,14 @@ class User < ApplicationRecord
 
   before_validation :apply_ui_layout_defaults
   before_validation :apply_role_based_ui_defaults
+
+  # Memberships are the source of truth for family access going forward.
+  # users.family_id is the legacy "primary family" pointer, kept as a
+  # denormalized back-compat column (Current falls back to it). Every path
+  # that changes a user's family — registration, invitation accept, SSO JIT
+  # provisioning, admin transfer — flows through this hook so no path can
+  # strand a user without a membership row.
+  after_save :ensure_family_membership_for_primary_family, if: :saved_change_to_family_id?
 
   # Returns the appropriate role for a new user creating a family.
   # The very first user of an instance becomes super_admin; subsequent users
@@ -163,6 +173,23 @@ class User < ApplicationRecord
 
   def accessible_accounts
     family.accounts.accessible_by(self)
+  end
+
+  # Returns the membership record linking this user to +family+, or nil when
+  # the user is not a member of it.
+  def membership_for(family)
+    return if family.blank?
+
+    family_memberships.detect { |membership| membership.family_id == family.id } ||
+      family_memberships.find_by(family_id: family.id)
+  end
+
+  def role_in(family)
+    membership_for(family)&.role
+  end
+
+  def member_of?(family)
+    membership_for(family).present?
   end
 
   def finance_accounts
@@ -703,6 +730,14 @@ class User < ApplicationRecord
   end
 
   private
+    def ensure_family_membership_for_primary_family
+      return if family_id.blank?
+
+      family_memberships.find_or_initialize_by(family_id: family_id) do |membership|
+        membership.role = FamilyMembership.role_for_legacy_role(role)
+      end.save!
+    end
+
     def apply_ui_layout_defaults
       self.ui_layout = (ui_layout.presence || self.class.default_ui_layout)
     end
