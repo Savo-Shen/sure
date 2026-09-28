@@ -1,0 +1,31 @@
+<%# Ledger (family) switcher. Rendered above the account sidebar; only appears
+    once the user belongs to more than one ledger. Each entry is a POST that
+    stores the selected family id on the session, so every scoped page
+    re-renders against the newly active ledger. %>
+<% ledgers = Current.user.families.order(:name).to_a %>
+<% if ledgers.size > 1 %>
+  <div class="mb-3" data-testid="ledger-switcher">
+    <%= render DS::Menu.new(variant: :button, placement: "bottom-start") do |menu| %>
+      <% menu.with_button(
+        class: "w-full flex items-center gap-2 p-2 rounded-lg bg-container shadow-border-xs text-primary hover:bg-container-hover transition-colors focus-ring",
+        aria: { label: t(".switch_ledger") }
+      ) do %>
+        <%= icon("notebook", size: "sm", class: "shrink-0 text-secondary") %>
+        <span class="flex-1 text-left text-sm font-medium truncate">
+          <%= Current.family&.name.presence || t(".unnamed_ledger") %>
+        </span>
+        <%= icon("chevrons-up-down", size: "sm", class: "shrink-0 text-secondary") %>
+      <% end %>
+
+      <% ledgers.each do |ledger| %>
+        <% menu.with_item(
+          variant: "button",
+          text: ledger.name.presence || t(".unnamed_ledger"),
+          icon: "notebook",
+          href: switch_family_path(family_id: ledger.id),
+          selected: ledger == Current.family
+        ) %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

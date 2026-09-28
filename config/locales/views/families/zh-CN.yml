@@ -1,0 +1,9 @@
+---
+zh-CN:
+  families:
+    switcher:
+      switch_ledger: 切换账本
+      unnamed_ledger: 未命名账本
+    switch:
+      switched: "正在查看 %{family}"
+      not_a_member: 你无法访问该账本

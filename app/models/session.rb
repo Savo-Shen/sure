@@ -20,6 +20,25 @@ class Session < ApplicationRecord
     super || {}
   end
 
+  # The family this session last switched to via the ledger switcher, or nil
+  # when the user has never switched (or the value was cleared). Stored in the
+  # session's jsonb `data` alongside tab preferences; validity against the
+  # user's memberships is enforced by Current when resolving the family.
+  def active_family_id
+    data["active_family_id"]
+  end
+
+  def switch_active_family!(family)
+    data["active_family_id"] = family.id
+    save!
+  end
+
+  def clear_active_family!
+    return if active_family_id.blank?
+
+    data.delete("active_family_id")
+    save!
+  end
 
   def get_preferred_tab(tab_key)
     data.dig("tab_preferences", tab_key)

@@ -339,6 +339,13 @@ Rails.application.routes.draw do
 
   resource :current_session, only: %i[update]
 
+  # Ledger (family) switching: stores the selected family id in the session and
+  # redirects to the dashboard, where all scoped data re-renders for the newly
+  # active ledger.
+  resource :family, only: [] do
+    post :switch
+  end
+
   resource :registration, only: %i[new create]
   resources :sessions, only: %i[index new create destroy]
   # Passwordless sign-in with a discoverable passkey. Unauthenticated by design;
