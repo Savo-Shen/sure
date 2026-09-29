@@ -130,14 +130,28 @@ x86_64 Colima 虚拟机中构建 Linux amd64 镜像：
 
 ```sh
 brew install lima-additional-guestagents # 首次使用 x86_64 Colima 时执行
-colima start amd64-build --arch x86_64 --vm-type qemu --cpus 4 --memory 8 --disk 100
+colima start amd64-build --arch x86_64 --vm-type qemu --cpus 4 --memory 8 --disk 100 --activate
 trap 'colima stop amd64-build' EXIT
+export DOCKER_CONTEXT=colima-amd64-build
+docker info --format '{{.OSType}}/{{.Architecture}}'
 bin/build_gzip.sh
 ```
 
 本机使用 x86_64 Colima 提供 Docker daemon，构建产物与生产服务器架构一致。
+`docker info` 应输出 `linux/amd64`；如果当前默认 Colima 是 ARM 架构，不要复用默认
+context 构建生产镜像。`DOCKER_CONTEXT` 用于确保构建脚本不会误用其他 Docker daemon。
 构建和后续部署完成后，`trap` 会自动执行 `colima stop amd64-build` 关闭 Colima；
 如果只需要构建，也请保留这两行，避免后台长期运行 Docker daemon。
+
+如果中途手动中断命令导致 `trap` 没有执行，请确认并手动关闭构建 profile：
+
+```sh
+colima stop amd64-build
+```
+
+构建过程中不要把 ARM Colima 中编译出的 `vendor/bundle` 或 Docker build cache
+复制到 amd64 镜像；这些原生扩展必须在目标架构环境中重新编译。构建产生的
+`savo-ledger-<commit>.tar.gz` 只用于上传，部署完成后应移出仓库或删除，不要提交。
 
 脚本会根据当前 Git commit 生成镜像和压缩包，例如：
 
