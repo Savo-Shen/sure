@@ -14,6 +14,7 @@ export default class extends Controller {
 
   static values = {
     data: Object,
+    labels: Object,
     nodeWidth: { type: Number, default: 15 },
     nodePadding: { type: Number, default: 20 },
     currencySymbol: { type: String, default: "$" },
@@ -210,9 +211,20 @@ export default class extends Controller {
       ]);
 
     return sankeyGenerator({
-      nodes: nodes.map((d) => ({ ...d })),
+      nodes: nodes.map((d) => ({
+        ...d,
+        name: this.labelsValue[this.#structuralNodeKind(d)] || d.name,
+      })),
       links: links.map((d) => ({ ...d })),
     });
+  }
+
+  #structuralNodeKind(node) {
+    return {
+      cash_flow_node: "cash_flow",
+      surplus_node: "surplus",
+      deficit_node: "deficit",
+    }[node.id];
   }
 
   #createGradients(svg, links) {

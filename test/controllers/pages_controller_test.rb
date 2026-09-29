@@ -21,6 +21,20 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
     assert_select "#netWorthChart[data-time-series-chart-selectable-value='true'][draggable='false']"
   end
 
+  test "dashboard passes localized structural cash flow labels to the chart" do
+    @user.update!(locale: "zh-CN")
+
+    get root_path
+
+    assert_response :ok
+    chart = css_select("[data-controller='sankey-chart']").first
+    labels = JSON.parse(chart["data-sankey-chart-labels-value"])
+
+    assert_equal "现金流", labels.fetch("cash_flow")
+    assert_equal "盈余", labels.fetch("surplus")
+    assert_equal "赤字", labels.fetch("deficit")
+  end
+
   test "inactive user's existing session is revoked" do
     session_record = @user.sessions.order(:created_at).last
     @user.update_column(:active, false)

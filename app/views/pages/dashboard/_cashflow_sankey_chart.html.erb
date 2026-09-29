@@ -2,6 +2,7 @@
 <div
   data-controller="sankey-chart"
   data-sankey-chart-data-value="<%= sankey_data.to_json %>"
+  data-sankey-chart-labels-value="<%= t("pages.dashboard.cashflow_preview.node_labels").to_json %>"
   data-sankey-chart-currency-symbol-value="<%= sankey_data[:currency_symbol] %>"
   data-sankey-chart-start-date-value="<%= period.start_date&.iso8601 %>"
   data-sankey-chart-end-date-value="<%= period.end_date&.iso8601 %>"
