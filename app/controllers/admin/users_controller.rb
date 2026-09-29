@@ -41,7 +41,11 @@ module Admin
         .group_by(&:family_id)
 
       @families = Family.order(:name, :created_at)
-      @unused_families = Family.left_joins(:users).where(users: { id: nil }).order(:name, :created_at)
+      # A user's primary family is stored on users.family_id, but they can
+      # belong to additional ledgers through memberships. A ledger with only
+      # non-primary members is still in use and must never be presented as an
+      # unused deletion candidate.
+      @unused_families = Family.where.missing(:family_memberships).order(:name, :created_at)
 
       @trials_expiring_in_7_days = Subscription
         .where(status: :trialing)

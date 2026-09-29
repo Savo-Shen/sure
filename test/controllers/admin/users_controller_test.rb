@@ -94,6 +94,21 @@ class Admin::UsersControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Delete unused family/, response.body)
   end
 
+  test "index does not list a ledger with only non-primary members as unused" do
+    joined_ledger = Family.create!(name: "Joined Ledger")
+    FamilyMembership.create!(user: users(:family_admin), family: joined_ledger, role: "owner")
+    Family.create!(name: "Truly Unused Ledger")
+
+    get admin_users_url
+
+    assert_response :success
+    unused_section = Nokogiri::HTML(response.body).css("h2").find { |heading| heading.text == "Unused families / groups" }&.parent
+
+    assert unused_section, "Expected the unused families section"
+    assert_not_includes unused_section.text, "Joined Ledger"
+    assert_includes unused_section.text, "Truly Unused Ledger"
+  end
+
   test "index renders the profile picture of users who have one" do
     user = users(:family_admin)
     user.profile_image.attach(
