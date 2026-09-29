@@ -24,9 +24,8 @@ ENV RAILS_ENV="production" \
 # Throw-away build stage to reduce size of final image
 FROM base AS build
 
-# Cross-platform release builds run Linux amd64 extensions under emulation on
-# Apple Silicon hosts.  A single Bundler worker avoids compiler crashes caused
-# by concurrent native-extension builds in that environment.
+# Native amd64 release builds use a single Bundler worker to keep compiler
+# resource usage predictable in the x86_64 build VM.
 ARG BUNDLE_JOBS=1
 
 # Install packages needed to build gems
