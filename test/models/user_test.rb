@@ -315,7 +315,8 @@ class UserTest < ActiveSupport::TestCase
 
     assert_match %r{otpauth://totp/}, user.provisioning_uri
     assert_match %r{secret=#{user.otp_secret}}, user.provisioning_uri
-    assert_match %r{issuer=Sure}, user.provisioning_uri
+    issuer = URI.decode_www_form(URI.parse(user.provisioning_uri).query).to_h.fetch("issuer")
+    assert_equal Rails.configuration.x.product_name, issuer
   end
 
   test "ai_available? returns true when openai access token set in settings" do

@@ -9,6 +9,16 @@ class PwaControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, '"start_url": "/"'
   end
 
+  test "manifest uses the Savo Ledger icon" do
+    get "/manifest"
+
+    manifest = JSON.parse(response.body)
+    icon = manifest.fetch("icons").sole
+
+    assert_includes icon.fetch("src"), "savo-ledger-logo"
+    assert_equal "any", icon.fetch("purpose")
+  end
+
   test "service worker responds successfully without origin or referer headers" do
     get "/service-worker", headers: {
       "Accept" => "*/*",

@@ -9,6 +9,10 @@ module ApplicationHelper
     Rails.configuration.x.brand_name
   end
 
+  def brand_logo(**options)
+    image_tag "savo-ledger-logo.png", alt: product_name, **options
+  end
+
   def styled_form_with(**options, &block)
     options[:builder] = StyledFormBuilder
     form_with(**options, &block)

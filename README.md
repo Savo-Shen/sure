@@ -96,6 +96,96 @@ If you loaded the optional demo data, log in with these credentials:
 
 For further instructions, see guides below.
 
+## Savo Ledger 本地编辑、编译与部署
+
+本项目的产品名称是 **Savo Ledger**，生产环境部署在 `savo-prod`，访问地址为
+`https://ledger.savo-shen.com`。本节记录当前实际使用的部署流程；不要把密码、
+加密密钥或 `.env` 文件提交到 Git。
+
+### 1. 本地编辑
+
+```sh
+cd /Users/savo_shen/Programs/savo-ledger
+git status --short --branch
+```
+
+修改 Rails、视图、Stimulus 或资源后，先阅读对应的 `docs/llm-guides/` 指南，
+然后运行针对性测试。多账本、导入和权限相关改动至少要覆盖控制器/模型行为测试。
+
+```sh
+bin/rails test test/controllers/families_controller_test.rb
+bin/rails test test/controllers/imports_controller_test.rb
+bin/rails test
+```
+
+前端和视图改动需要在独立浏览器中验证登录、账本切换、账户、交易和导入流程。
+浏览器自动化使用 Playwright skill 提供的脚本，测试产物放在 `output/playwright/`。
+
+### 2. 本地编译/构建
+
+默认 Dockerfile 生成生产镜像。构建时传入提交标识，便于在生产菜单和日志中确认版本：
+
+```sh
+docker build --platform linux/amd64 \
+  --build-arg BUILD_COMMIT_SHA="$(git rev-parse --short HEAD)" \
+  -t sure:savo-ledger-$(git rev-parse --short HEAD) .
+```
+
+如果本机 Docker 不是 amd64，使用服务器 Docker daemon 构建：
+
+```sh
+DOCKER_HOST=ssh://savo-prod docker build --network host --pull=false \
+  --platform linux/amd64 \
+  --build-arg BUILD_COMMIT_SHA="$(git rev-parse --short HEAD)" \
+  -t sure:savo-ledger-$(git rev-parse --short HEAD) .
+```
+
+### 3. 部署到 savo-prod
+
+生产目录是 `/opt/savo-ledger`，Compose 服务包括 `web`、`worker`、`db` 和 `redis`。
+PostgreSQL 与 Redis 由该 Compose 项目复用，不要重复创建基础设施或直接覆盖数据库卷。
+
+```sh
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose config --quiet'
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d web worker'
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose ps'
+```
+
+使用远程构建镜像时，更新 `/opt/savo-ledger/.env` 中的镜像标签后再重建 Web/Worker：
+
+```sh
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d --force-recreate web worker'
+```
+
+不要在生产环境执行 `rails server`、手工修改数据库或自动运行迁移；需要迁移时先
+确认备份和维护窗口，再按项目开发指南执行。
+
+### 4. 部署后检查
+
+```sh
+ssh savo-prod 'curl -fsS https://ledger.savo-shen.com/up'
+curl -fsSI https://ledger.savo-shen.com/sessions/new
+```
+
+浏览器中至少检查：登录/退出、个人账本与 `Lab` 切换、创建账户、初始余额、交易、
+报表和导入页面。出现错误时先查看：
+
+```sh
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose logs --tail 200 web worker'
+```
+
+### 5. 备份与回滚
+
+部署前保留数据库和旧应用数据备份。当前服务器上的 Actual 原始数据、迁移副本和
+压缩备份位于 `/opt/lab-finance/` 及相关备份目录，除非确认迁移完成，否则不要删除。
+回滚时恢复上一镜像标签和 Compose 配置，再执行：
+
+```sh
+ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d --force-recreate web worker'
+```
+
+生产密钥只保存在服务器 `.env`，不复制到本地、README、日志或提交记录中。
+
 ### Setup Guides
 
 - [Mac dev setup](https://github.com/we-promise/sure/wiki/Mac-Dev-Setup-Guide)

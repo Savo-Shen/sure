@@ -44,6 +44,14 @@ class ApplicationHelperTest < ActionView::TestCase
     assert_equal "Test Header Title", content_for(:header_title)
   end
 
+  test "#brand_logo uses the Savo Ledger asset and product name" do
+    logo = brand_logo(class: "w-9")
+
+    assert_includes logo, "savo-ledger-logo"
+    assert_includes logo, "alt=\"Savo Ledger\""
+    assert_includes logo, "class=\"w-9\""
+  end
+
   test "#sidekiq_web_available? returns true when the route is mounted" do
     named_routes = Struct.new(:defined) do
       def route_defined?(name)

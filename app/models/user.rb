@@ -916,7 +916,7 @@ class User < ApplicationRecord
     end
 
     def totp
-      ROTP::TOTP.new(otp_secret, issuer: "Sure Finances")
+      ROTP::TOTP.new(otp_secret, issuer: Rails.configuration.x.product_name)
     end
 
     def consume_backup_code!(normalized_code)
