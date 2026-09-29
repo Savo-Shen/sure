@@ -15,7 +15,8 @@ class ReleaseHighlightsControllerTest < ActionDispatch::IntegrationTest
       body: "<p>Shiny new things</p>"
     }
     github_provider = mock
-    github_provider.expects(:fetch_release_notes).with(Sure.version.to_release_tag).returns(release_notes)
+    github_provider.expects(:release_notes_cached?).with(Sure.version.to_release_tag).returns(true)
+    github_provider.expects(:cached_release_notes).with(Sure.version.to_release_tag).returns(release_notes)
     Provider::Registry.stubs(:get_provider).with(:github).returns(github_provider)
 
     get release_highlight_path
@@ -29,7 +30,7 @@ class ReleaseHighlightsControllerTest < ActionDispatch::IntegrationTest
     @user.mark_release_seen!(Sure.version.to_release_tag)
 
     github_provider = mock
-    github_provider.expects(:fetch_release_notes).never
+    github_provider.expects(:release_notes_cached?).never
     Provider::Registry.stubs(:get_provider).with(:github).returns(github_provider)
 
     get release_highlight_path
@@ -39,12 +40,25 @@ class ReleaseHighlightsControllerTest < ActionDispatch::IntegrationTest
 
   test "show returns no content when release notes are unavailable" do
     github_provider = mock
-    github_provider.expects(:fetch_release_notes).returns(nil)
+    github_provider.expects(:release_notes_cached?).with(Sure.version.to_release_tag).returns(true)
+    github_provider.expects(:cached_release_notes).with(Sure.version.to_release_tag).returns(false)
     Provider::Registry.stubs(:get_provider).with(:github).returns(github_provider)
 
     get release_highlight_path
 
     assert_response :no_content
+  end
+
+  test "show enqueues a prefetch on a cache miss" do
+    github_provider = mock
+    github_provider.expects(:release_notes_cached?).with(Sure.version.to_release_tag).returns(false)
+    Provider::Registry.stubs(:get_provider).with(:github).returns(github_provider)
+
+    assert_enqueued_with(job: ReleaseHighlightsPrefetchJob, args: [ Sure.version.to_release_tag ]) do
+      get release_highlight_path
+    end
+
+    assert_response :accepted
   end
 
   test "dismiss marks the given tag as seen" do

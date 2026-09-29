@@ -1,10 +1,18 @@
 class ReleaseHighlightsController < ApplicationController
   # The "What's new" popup content: release notes for the deployed release
-  # the current account has not seen yet. Fetched lazily on the user's first
-  # interaction so ordinary page renders never hit the GitHub API.
+  # the current account has not seen yet. A cache miss is filled in a
+  # low-priority job, so an interaction never waits on the GitHub API.
   def show
     tag = ReleaseHighlights.pending_tag_for(Current.user)
-    @release_notes = tag && Provider::Registry.get_provider(:github)&.fetch_release_notes(tag)
+    provider = tag && Provider::Registry.get_provider(:github)
+
+    if provider && !provider.release_notes_cached?(tag)
+      ReleaseHighlightsPrefetchJob.perform_later(tag)
+      head :accepted
+      return
+    end
+
+    @release_notes = provider&.cached_release_notes(tag)
 
     if @release_notes
       render :show, layout: false

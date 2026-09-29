@@ -18,11 +18,16 @@ ARG BUILD_COMMIT_SHA
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development" \
+    BUNDLE_WITHOUT="development:test" \
     BUILD_COMMIT_SHA=${BUILD_COMMIT_SHA}
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
+
+# Cross-platform release builds run Linux amd64 extensions under emulation on
+# Apple Silicon hosts.  A single Bundler worker avoids compiler crashes caused
+# by concurrent native-extension builds in that environment.
+ARG BUNDLE_JOBS=1
 
 # Install packages needed to build gems
 RUN apt-get update -qq \
@@ -31,7 +36,7 @@ RUN apt-get update -qq \
 
 # Install application gems
 COPY .ruby-version Gemfile Gemfile.lock ./
-RUN bundle install \
+RUN bundle install --jobs "${BUNDLE_JOBS}" \
     && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git \
     && bundle exec bootsnap precompile --gemfile -j 0
 

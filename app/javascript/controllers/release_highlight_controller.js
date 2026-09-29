@@ -112,15 +112,25 @@ export default class extends Controller {
     this.fetchAbort = new AbortController();
 
     try {
-      const response = await fetch(this.contentUrlValue, {
-        headers: { Accept: "text/html" },
-        signal: this.fetchAbort.signal,
-      });
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const response = await fetch(this.contentUrlValue, {
+          headers: { Accept: "text/html" },
+          signal: this.fetchAbort.signal,
+        });
 
-      if (!response.ok) return null;
+        if (!response.ok) return null;
 
-      const html = await response.text();
-      return html.trim().length > 0 ? html : null;
+        if (response.status === 202) {
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
+          if (!this.element.isConnected) return null;
+          continue;
+        }
+
+        const html = await response.text();
+        return html.trim().length > 0 ? html : null;
+      }
+
+      return null;
     } catch (error) {
       if (error.name !== "AbortError") {
         console.error("[Release Highlight] Failed to load notes:", error);

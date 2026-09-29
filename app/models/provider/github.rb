@@ -30,7 +30,21 @@ class Provider::Github
     end
   end
 
+  # Foreground requests serve this cached value; a low-priority job fills a
+  # miss so a user interaction never waits for GitHub.
+  def cached_release_notes(tag)
+    Rails.cache.read(release_notes_cache_key(tag))
+  end
+
+  def release_notes_cached?(tag)
+    Rails.cache.exist?(release_notes_cache_key(tag))
+  end
+
   private
+    def release_notes_cache_key(tag)
+      "github_release_notes_#{tag}"
+    end
+
     def repo
       "#{owner}/#{name}"
     end

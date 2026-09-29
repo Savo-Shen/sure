@@ -16,3 +16,10 @@ Rails.application.config.filter_parameters += [
   # credential_id and has_*_credentials, and :events any key containing "events".
   /\A(publisher_)?credential\z/i, /\Aevents\z/i, /\Aconsent\z/i, /\Abooked_balance\z/i
 ]
+
+# logtail-rack logs HTTP headers separately from Rails parameters. Filtering
+# them avoids retaining bearer credentials and large session cookies in the
+# container log while preserving request timing and route diagnostics.
+Logtail::Integrations::Rack::HTTPEvents.http_header_filters = [
+  "Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-CSRF-Token"
+]
