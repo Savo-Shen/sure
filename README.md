@@ -124,17 +124,20 @@ bin/rails test
 ### 2. 本地编译/构建
 
 生产镜像统一在本地构建，不在服务器上执行 Ruby、gem、系统依赖或前端资源编译。
-即使本机是 Apple Silicon，也通过 Docker Buildx 交叉构建 Linux amd64 镜像：
+由于 Rails 使用 `pg`、`redcarpet`、`msgpack` 等 Ruby 原生扩展，Apple Silicon
+不能像 Go 项目那样只设置 `GOOS/GOARCH` 就完成安全的交叉编译；需要在本机的
+x86_64 Colima 虚拟机中构建 Linux amd64 镜像：
 
 ```sh
-colima start
-trap 'colima stop' EXIT
+brew install lima-additional-guestagents # 首次使用 x86_64 Colima 时执行
+colima start amd64-build --arch x86_64 --vm-type qemu --cpus 4 --memory 8 --disk 100
+trap 'colima stop amd64-build' EXIT
 bin/build_gzip.sh
 ```
 
-本机使用 Colima 提供 Docker daemon。构建和后续部署完成后，`trap` 会自动执行
-`colima stop` 关闭 Colima；如果只需要构建，也请保留这两行，避免后台长期运行
-Docker daemon。
+本机使用 x86_64 Colima 提供 Docker daemon，构建产物与生产服务器架构一致。
+构建和后续部署完成后，`trap` 会自动执行 `colima stop amd64-build` 关闭 Colima；
+如果只需要构建，也请保留这两行，避免后台长期运行 Docker daemon。
 
 脚本会根据当前 Git commit 生成镜像和压缩包，例如：
 
