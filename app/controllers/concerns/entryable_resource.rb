@@ -36,7 +36,10 @@ module EntryableResource
     @entry.destroy!
     @entry.sync_account_later
 
-    redirect_back_or_to account_path(@entry.account), notice: t("account.entries.destroy.success")
+    redirect_back_or_to account_path(@entry.account), notice: {
+      message: t("account.entries.destroy.success"),
+      description: t("entries.balance_update_pending")
+    }
   end
 
   private

@@ -71,6 +71,18 @@ class IncomeStatement::SankeyTest < ActiveSupport::TestCase
     assert_balanced(result)
   end
 
+  test "localizes structural node labels" do
+    transaction(-100, @parent)
+    transaction(40, @child)
+
+    I18n.with_locale(:"zh-CN") do
+      result = graph
+
+      assert_equal "现金流", node(result, "cash_flow_node")[:name]
+      assert_equal "盈余", node(result, "surplus_node")[:name]
+    end
+  end
+
   test "preserves FX precision, reporting eligibility and surplus" do
     eur = @family.accounts.create!(name: "EUR", currency: "EUR", balance: 0, accountable: Depository.new)
     ExchangeRate.create!(from_currency: "EUR", to_currency: "USD", date: @month, rate: "1.2345")

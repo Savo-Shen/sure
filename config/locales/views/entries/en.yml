@@ -1,6 +1,7 @@
 ---
 en:
   entries:
+    balance_update_pending: Your balance is updating and will refresh automatically.
     create:
       success: Entry created
     destroy:

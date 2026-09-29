@@ -21,5 +21,12 @@ module EntryableResourceInterfaceTest
     assert_enqueued_with job: SyncJob
 
     assert_redirected_to account_url(@entry.account)
+    assert_equal(
+      {
+        message: "Entry deleted successfully.",
+        description: "Your balance is updating and will refresh automatically."
+      },
+      flash[:notice]
+    )
   end
 end

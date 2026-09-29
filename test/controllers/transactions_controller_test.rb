@@ -110,7 +110,10 @@ class TransactionsControllerTest < ActionDispatch::IntegrationTest
     created_entry = Entry.order(:created_at).last
 
     assert_redirected_to account_url(created_entry.account)
-    assert_equal "Transaction created", flash[:notice]
+    assert_equal(
+      { message: "Transaction created", description: "Your balance is updating and will refresh automatically." },
+      flash[:notice]
+    )
     assert_enqueued_with(job: SyncJob)
   end
 
@@ -143,7 +146,10 @@ class TransactionsControllerTest < ActionDispatch::IntegrationTest
       post transactions_url, params: params
     end
     assert_response :redirect
-    assert_equal "Transaction created", flash[:notice]
+    assert_equal(
+      { message: "Transaction created", description: "Your balance is updating and will refresh automatically." },
+      flash[:notice]
+    )
     assert_redirected_to account_url(first_entry.account)
   end
 
@@ -207,7 +213,10 @@ class TransactionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :redirect
     assert_redirected_to account_url(winning_entry.account)
-    assert_equal "Transaction created", flash[:notice]
+    assert_equal(
+      { message: "Transaction created", description: "Your balance is updating and will refresh automatically." },
+      flash[:notice]
+    )
   end
 
   test "a RecordNotUnique with no matching entry is not silently swallowed" do

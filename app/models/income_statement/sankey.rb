@@ -13,7 +13,7 @@ class IncomeStatement::Sankey
     spending = groups.sum { |group| side_total(group, :expense) }.to_d
     capacity = [ income, spending ].max
     unless capacity.zero?
-      center = add_node("cash_flow_node", "Cash Flow", :cash_flow, capacity, 100)
+      center = add_node("cash_flow_node", localized_label(:cash_flow), :cash_flow, capacity, 100)
       groups.each do |group|
         add_group(group, :income, income, center)
         add_group(group, :expense, spending, center)
@@ -21,7 +21,7 @@ class IncomeStatement::Sankey
       net = income - spending
       unless net.zero?
         kind = net.positive? ? :surplus : :deficit
-        index = add_node("#{kind}_node", kind.to_s.capitalize, kind, net.abs, percentage(net.abs, capacity))
+        index = add_node("#{kind}_node", localized_label(kind), kind, net.abs, percentage(net.abs, capacity))
         source, target = net.positive? ? [ center, index ] : [ index, center ]
         add_link(source, target, net.abs, percentage(net.abs, capacity))
       end
@@ -51,6 +51,10 @@ class IncomeStatement::Sankey
       return "uncategorized" if category.uncategorized?
       return "other_investments" if category.other_investments?
       category.id
+    end
+
+    def localized_label(kind)
+      I18n.t("pages.dashboard.cashflow_preview.node_labels.#{kind}", default: kind.to_s.humanize)
     end
 
     def side_amount(net, side)

@@ -1,6 +1,7 @@
 ---
 zh-CN:
   entries:
+    balance_update_pending: 余额正在更新，完成后会自动刷新。
     create:
       success: 记录已创建
     destroy:

@@ -154,6 +154,42 @@ class Assistant::Function::CreateTransactionTest < ActiveSupport::TestCase
     assert_equal first[:transaction][:id], second[:transaction][:id]
   end
 
+  test "warns instead of creating an identical transaction" do
+    params = {
+      "account_id" => @account.id,
+      "date" => "2026-09-11",
+      "amount" => 100.00,
+      "type" => "expense",
+      "name" => "Coffee   Shop"
+    }
+
+    first = @function.call(params)
+    second = @function.call(params.merge("name" => " coffee shop "))
+
+    assert_equal true, first[:success]
+    assert_equal false, second[:success]
+    assert_equal "duplicate_transaction", second[:error]
+    assert_equal first[:transaction][:id], second[:transaction][:id]
+    assert_equal 1, @account.entries.where(name: [ "Coffee   Shop", " coffee shop " ]).count
+  end
+
+  test "creates an identical transaction after explicit confirmation" do
+    params = {
+      "account_id" => @account.id,
+      "date" => "2026-09-11",
+      "amount" => 100.00,
+      "type" => "expense",
+      "name" => "Coffee Shop"
+    }
+
+    @function.call(params)
+    result = @function.call(params.merge("allow_duplicate" => true))
+
+    assert_equal true, result[:success]
+    assert_equal true, result[:created]
+    assert_equal 2, @account.entries.where(name: "Coffee Shop", date: Date.new(2026, 9, 11)).count
+  end
+
   test "rejects an account the user cannot write to" do
     other_account = accounts(:other_asset)
     # other_asset is owned by family_admin too, so use a different approach:

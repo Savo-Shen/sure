@@ -652,7 +652,10 @@ class TransactionsController < ApplicationController
     end
 
     def respond_with_created_entry(entry)
-      flash[:notice] = t(".created")
+      flash[:notice] = {
+        message: t(".created"),
+        description: t("entries.balance_update_pending")
+      }
 
       respond_to do |format|
         format.html { redirect_back_or_to account_path(entry.account) }

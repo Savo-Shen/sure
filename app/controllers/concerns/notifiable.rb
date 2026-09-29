@@ -47,8 +47,19 @@ module Notifiable
       when "cta"
         [ resolve_cta(data) ]
       when "notice"
-        messages = Array(data)
-        messages.map { |message| { partial: "shared/notifications/notice", locals: { message: message } } }
+        Array(data).map do |notice|
+          if notice.is_a?(Hash)
+            message = notice.fetch(:message) { notice.fetch("message") }
+            description = notice[:description] || notice["description"]
+
+            {
+              partial: "shared/notifications/notice",
+              locals: { message:, description: }
+            }
+          else
+            { partial: "shared/notifications/notice", locals: { message: notice } }
+          end
+        end
       else
         []
       end

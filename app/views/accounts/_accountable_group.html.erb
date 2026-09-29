@@ -4,14 +4,14 @@
   <% is_open = open.nil? ? (account_group.accounts.any? { |account| page_active?(account_path(account)) } || Current.user.always_expanded_account_group?(account_group.key)) : open %>
   <%= render DS::Disclosure.new(align: :left, open: is_open) do |disclosure| %>
     <% disclosure.with_summary_content do %>
-      <div class="flex items-center gap-3">
+      <div class="flex self-start items-center gap-3">
         <%= icon "chevron-right", class: "group-open:transform group-open:rotate-90" %>
         <%= tag.span class: class_names("text-sm text-primary font-medium", "animate-pulse" => account_group.syncing?) do %>
           <%= account_group.name %>
         <% end %>
       </div>
 
-      <div class="ml-auto text-right grow">
+      <div class="self-start ml-auto text-right grow">
         <%= tag.p format_money(account_group.total_money), class: "text-sm font-medium text-primary privacy-sensitive" %>
         <%= turbo_frame_tag "#{account_group.key}_sparkline", src: accountable_sparkline_path(account_group.key), loading: "lazy", data: { controller: "turbo-frame-timeout", turbo_frame_timeout_timeout_value: 10000 } do %>
           <div class="flex items-center w-8 h-4 ml-auto">

@@ -34,6 +34,13 @@ class Assistant::Function::CreateTransaction < Assistant::Function
         "expense"); the sign is then derived from `type`. If you pass neither
         a sign nor a `type`, the amount is stored exactly as given.
 
+        Duplicate protection: before creating, this checks for an existing
+        transaction on the same account with the same normalized name, date,
+        signed amount, and currency. If one exists, it returns that transaction
+        and does not create another unless `allow_duplicate` is true. Only set
+        `allow_duplicate` after the user explicitly confirms these are separate
+        transactions.
+
         Idempotency: if you pass `external_id` (and optionally `source`,
         defaulting to "mcp"), a repeat call with the same account + source +
         external_id returns the existing transaction instead of creating a
@@ -123,6 +130,10 @@ class Assistant::Function::CreateTransaction < Assistant::Function
         user_modified: {
           type: "boolean",
           description: "If true, mark the transaction user-modified so a later provider sync will not overwrite it (defaults to false)."
+        },
+        allow_duplicate: {
+          type: "boolean",
+          description: "Set true only after the user explicitly confirms an otherwise identical existing transaction is a separate transaction."
         }
       }
     )
@@ -181,6 +192,9 @@ class Assistant::Function::CreateTransaction < Assistant::Function
       existing = existing_idempotent_entry(account, entry_params)
       return existing_response(existing) if existing
     end
+
+    existing_duplicate = existing_duplicate_entry(account, entry_params)
+    return duplicate_response(existing_duplicate) if existing_duplicate && !allow_duplicate?(params)
 
     entry = account.entries.new(entry_params)
     unless entry.save
@@ -283,6 +297,10 @@ class Assistant::Function::CreateTransaction < Assistant::Function
       ActiveModel::Type::Boolean.new.cast(params["user_modified"])
     end
 
+    def allow_duplicate?(params)
+      ActiveModel::Type::Boolean.new.cast(params["allow_duplicate"])
+    end
+
     # Coerce a nullable UUID parameter: returns nil for blank input, the value
     # if it is a valid UUID, or an error hash otherwise.
     def optional_uuid(value)
@@ -329,6 +347,30 @@ class Assistant::Function::CreateTransaction < Assistant::Function
       )
     end
 
+    # Exact duplicate guard for conversational retries. Whitespace and case in
+    # a payee name are presentation differences, not evidence of a distinct
+    # purchase; every other field remains exact so two similar purchases are
+    # not conflated. There is deliberately no database uniqueness constraint:
+    # legitimate identical purchases remain possible after explicit approval.
+    def existing_duplicate_entry(account, entry_params)
+      normalized_name = normalize_name(entry_params[:name])
+
+      account.entries
+        .where(
+          entryable_type: "Transaction",
+          date: entry_params[:date],
+          amount: entry_params[:amount],
+          currency: entry_params[:currency]
+        )
+        .where("LOWER(BTRIM(REGEXP_REPLACE(entries.name, '[[:space:]]+', ' ', 'g'))) = ?", normalized_name)
+        .order(created_at: :desc)
+        .first
+    end
+
+    def normalize_name(name)
+      name.to_s.gsub(/\s+/, " ").strip.downcase
+    end
+
     # Build the response for an idempotency hit. If the existing entry is a
     # transaction, return it with created: false; if it is some other entry
     # type, return an idempotency_conflict error.
@@ -343,6 +385,16 @@ class Assistant::Function::CreateTransaction < Assistant::Function
         created: false,
         transaction: serialize(existing.entryable),
         message: "Transaction already exists for this external_id; returned the existing one."
+      }
+    end
+
+    def duplicate_response(existing)
+      {
+        success: false,
+        error: "duplicate_transaction",
+        transaction: serialize(existing.entryable),
+        message: "An identical transaction already exists. Ask the user to confirm before creating another.",
+        hint: "Tell the user about the existing transaction. Only retry with allow_duplicate: true after they explicitly confirm it is separate."
       }
     end
 

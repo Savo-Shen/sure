@@ -104,6 +104,15 @@ export default class extends Controller {
   }
 
   #userIsInteracting() {
+    // A chat response is stateful work too. A sync can be caused by an
+    // assistant-created transaction, and refreshing between that tool call and
+    // the assistant's final text response can leave the replacement page
+    // subscribed too late to receive the broadcast. Keep the toast available
+    // for a manual refresh until the pending response has resolved.
+    if (document.querySelector('[data-chat-target="pendingResponse"]')) {
+      return true;
+    }
+
     const el = document.activeElement;
     if (!el || el === document.body || el === document.documentElement)
       return false;
