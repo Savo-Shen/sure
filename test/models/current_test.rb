@@ -41,4 +41,27 @@ class CurrentTest < ActiveSupport::TestCase
     assert_not @user.member_of?(stranger_family)
     assert_equal @user.family, Current.family
   end
+
+  test "family is resolved once per request context" do
+    other_family = families(:empty)
+    FamilyMembership.create!(user: @user, family: other_family, role: "editor")
+    session = @user.sessions.create!
+    session.switch_active_family!(other_family)
+    Current.session = session
+
+    @user.expects(:family_memberships).once.returns(@user.family_memberships)
+
+    assert_equal other_family, Current.family
+    assert_equal other_family, Current.family
+  end
+
+  test "reset clears the resolved user and family" do
+    Current.session = @user.sessions.create!
+    assert_equal @user, Current.user
+
+    Current.reset
+
+    assert_nil Current.user
+    assert_nil Current.family
+  end
 end

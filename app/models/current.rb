@@ -3,6 +3,7 @@ class Current < ActiveSupport::CurrentAttributes
 
   attribute :session
   attribute :latest_sync_by_syncable, :latest_completed_sync_by_syncable, :syncing_by_syncable
+  attribute :resolved_user, :resolved_family, :user_context_loaded, :family_context_loaded
 
   # The family (ledger) all scoped queries run against. Resolves to the
   # session's active family when the user has switched ledgers and still holds
@@ -11,17 +12,24 @@ class Current < ActiveSupport::CurrentAttributes
   # membership can never leak another ledger's data through a stale session
   # value — the fallback just brings the user back to their primary family.
   #
-  # Deliberately not memoized: ActiveSupport::CurrentAttributes#reset clears
-  # declared attributes but not plain ivars, so a memoized family would leak
-  # across requests on the same thread. The lookups below ride on the
-  # session/user association cache instead, so repeated calls in one request
-  # stay cheap.
+  # The resolved context is stored in declared CurrentAttributes so reset
+  # clears it between requests. This avoids repeatedly walking memberships
+  # from the application layout and its helpers while remaining safe when a
+  # thread is reused for another request.
   def family
-    active_family_from_session || user&.family
+    return resolved_family if family_context_loaded
+
+    self.resolved_family = active_family_from_session || user&.family
+    self.family_context_loaded = true
+    resolved_family
   end
 
   def user
-    impersonated_user || session&.user
+    return resolved_user if user_context_loaded
+
+    self.resolved_user = impersonated_user || session&.user
+    self.user_context_loaded = true
+    resolved_user
   end
 
   def impersonated_user

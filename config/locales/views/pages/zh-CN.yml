@@ -40,11 +40,33 @@ zh-CN:
           cash_flow: "现金流"
           surplus: "盈余"
           deficit: "赤字"
+        title: 新版桑基图
+        preview: 预览
+        preview_tooltip: 此图表使用了移动端 Swift 客户端共享的新 API，将替换上方的可视化图表。
+        feedback_prompt: 请将此图表与上方的原图进行比较，并告诉我们除排序外是否存在差异。
+        positive: 看起来正确
+        negative: 看起来有问题
+        feedback_title: 现金流图表反馈
+        feedback_loading: 正在加载反馈表单……
+        feedback_unavailable: 反馈暂时不可用，请稍后重试。
+        feedback_thanks: 感谢您帮助改进图表！
+        feedback_privacy: 您的回复会发送至 PostHog。请描述问题时不要包含账号、余额或其他私人财务信息。
+        feedback_submit: 发送反馈
       welcome: 欢迎回来，%{name}
       subtitle: 以下是您的财务状况概览
       new: 新建
+      sections_aria_label: 仪表盘模块
       drag_to_reorder: 拖动以重新排序模块
       toggle_section: 切换模块可见性
+      widget_size:
+        label: 调整大小
+        width_label: 宽度
+        half: 半宽
+        full: 全宽
+        height_label: 高度
+        compact: 紧凑
+        auto: 自动
+        tall: 高
       net_worth_chart:
         data_not_available: 所选时间段内无可用数据
         title: 净资产
@@ -63,10 +85,15 @@ zh-CN:
         name: 名称
         weight: 占比
         value: 金额
+        expand_all: 全部展开
+        collapse_all: 全部收起
         classifications:
           asset: 资产
           liability: 负债
       cashflow_sankey:
+        loading: 正在加载现金流……
+        load_error: 无法加载现金流，请重试。
+        retry: 重试
         title: 现金流
         zoom_out: 返回完整现金流
         no_data_title: 此时间段内没有现金流数据
@@ -95,6 +122,30 @@ zh-CN:
         trades: 交易
         no_investments: 暂无投资账户
         add_investment: 添加投资账户以跟踪您的投资组合
+      insights_feed:
+        title: 洞察
+      money_flow:
+        title: 收支
+        date_range: "%{start_date} 至 %{end_date}"
+        month_picker_aria_label: 选择月份
+        filter_accounts: 筛选账户（%{count}）
+        filter_accounts_all: 所有账户
+        period_scope_hint: 显示您在此选择的月份，与顶部仪表盘的时间段无关。
+        search_accounts: 搜索账户
+        apply: 应用
+        balance: 交易余额
+        chart_span: 最近 %{count} 个月
+        income: 收入
+        expenses: 支出
+      spending_trend:
+        title: 支出趋势
+        date_range: "%{start_date} 至 %{end_date}"
+        date_range_short: "%{start_date} - %{end_day}日，%{year}年"
+        date_range_short_single: "%{date}，%{year}年"
+        month_picker_aria_label: 选择月份
+        period_scope_hint: 显示您在此选择的月份，与顶部仪表盘的时间段无关。
+        no_data: 本月暂无支出数据
+        previous_comparison_days: （1-%{end_day}日）
     release_notes_unavailable:
       name: 发布说明暂不可用
       body_html: "<p>暂时无法获取最新发布说明。请稍后再试，或直接访问 <a href='https://github.com/we-promise/sure/releases' target='_blank' rel='noopener noreferrer'>GitHub releases 页面</a>。</p>"

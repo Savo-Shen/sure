@@ -27,13 +27,15 @@ module AccountsHelper
   # returns the values as Strings for raw SQL fragments — that's fine
   # since they only feed into a cache key (concat-stable, never coerced).
   def account_sidebar_tabs_cache_key(family:, active_tab:, mobile:)
-    shares_version =
-      if Current.user
-        count, max_at = AccountShare
-          .where(user_id: Current.user.id)
-          .pick(Arel.sql("count(*)"), Arel.sql("max(updated_at)"))
-        "#{count}-#{max_at}"
-      end
+    # The application layout renders this partial for both the desktop and
+    # mobile sidebars. Reuse the version lookup for both instances; the
+    # fragment key still differs by `mobile` below.
+    shares_version = @account_sidebar_shares_version ||= if Current.user
+      count, max_at = AccountShare
+        .where(user_id: Current.user.id)
+        .pick(Arel.sql("count(*)"), Arel.sql("max(updated_at)"))
+      "#{count}-#{max_at}"
+    end
 
     [
       family.build_cache_key("account_sidebar_tabs_v3", invalidate_on_data_updates: true),
