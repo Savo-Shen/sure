@@ -96,6 +96,23 @@ class PeriodTest < ActiveSupport::TestCase
     assert_equal "All", period.label_short
   end
 
+  test "simplified Chinese period short labels localize units and abbreviations" do
+    I18n.with_locale(:"zh-CN") do
+      assert_equal "1天", Period.from_key("last_day").label_short
+      assert_equal "本周", Period.from_key("current_week").label_short
+      assert_equal "7天", Period.from_key("last_7_days").label_short
+      assert_equal "本月", Period.from_key("current_month").label_short
+      assert_equal "上月", Period.from_key("last_month").label_short
+      assert_equal "30天", Period.from_key("last_30_days").label_short
+      assert_equal "90天", Period.from_key("last_90_days").label_short
+      assert_equal "本年", Period.from_key("current_year").label_short
+      assert_equal "365天", Period.from_key("last_365_days").label_short
+      assert_equal "5年", Period.from_key("last_5_years").label_short
+      assert_equal "10年", Period.from_key("last_10_years").label_short
+      assert_equal "全部", Period.from_key("all_time").label_short
+    end
+  end
+
   test "all_time period uses family's oldest entry date" do
     # Mock Current.family to return a family with oldest_entry_date
     mock_family = mock("family")

@@ -237,7 +237,7 @@ export default class extends Controller {
             this._normalDataPoints[this._normalDataPoints.length - 1].date,
           ])
           .tickSize(0)
-          .tickFormat(d3.timeFormat("%b %d, %Y")),
+          .tickFormat((date) => this._formatXAxisDate(date)),
       )
       .select(".domain")
       .remove();
@@ -254,6 +254,28 @@ export default class extends Controller {
         return i === 0 ? "5em" : "-5em";
       })
       .attr("dy", "0em");
+  }
+
+  _formatXAxisDate(date) {
+    // Series values already carry a server-localized date. Reuse it so the
+    // axis and tooltip agree, including Chinese formats that d3's English
+    // time formatter cannot represent.
+    const formattedDate = this._normalDataPoints.find(
+      (point) => point.date.getTime() === date.getTime(),
+    )?.date_formatted;
+
+    if (formattedDate) return formattedDate;
+
+    const locale = document.documentElement.lang || "en";
+    if (locale.toLowerCase().startsWith("zh")) {
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(date);
   }
 
   _drawGradientBelowTrendline() {
