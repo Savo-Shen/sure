@@ -1,0 +1,10 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+USER root
+COPY --chown=rails:rails . /rails
+USER 1000:1000
+
+RUN rm -rf /rails/public/assets \
+    && cd /rails \
+    && SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
