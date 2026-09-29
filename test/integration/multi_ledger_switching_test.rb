@@ -132,5 +132,13 @@ class MultiLedgerSwitchingTest < ActionDispatch::IntegrationTest
     get chats_path
     assert_response :success
     assert_select "form[action=?]", switch_family_path(family_id: @primary.id)
+    assert_select "a[href=?]", new_family_path
+  end
+
+  test "the sidebar switcher offers a new ledger with a single ledger too" do
+    get transactions_path
+    assert_response :success
+
+    assert_select "a[href=?]", new_family_path
   end
 end

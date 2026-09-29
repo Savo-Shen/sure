@@ -4,6 +4,16 @@ zh-CN:
     switcher:
       switch_ledger: 切换账本
       unnamed_ledger: 未命名账本
+      new_ledger: 新建账本
     switch:
       switched: "正在查看 %{family}"
       not_a_member: 你无法访问该账本
+    new:
+      title: 新建账本
+      subtitle: "一个独立的%{moniker}，有自己的账户、交易和成员。你将自动成为它的所有者。"
+      name_label: 账本名称
+      name_placeholder: 例如：家庭、工作室
+      currency_label: 货币
+      submit: 创建账本
+    create:
+      created: "已创建账本 %{family}"

@@ -18,4 +18,17 @@ class DS::TabsTest < ViewComponent::TestCase
     assert_selector "[data-ds--tabs-url-param-key-value='tab']"
     assert_selector "[data-ds--tabs-navigate-on-change-value='true']"
   end
+
+  test "tab buttons never wrap their labels" do
+    render_inline(DS::Tabs.new(active_tab: "one")) do |tabs|
+      tabs.with_nav do |nav|
+        nav.with_btn(id: "one", label: "One")
+        nav.with_btn(id: "two", label: "Two")
+      end
+      tabs.with_panel(tab_id: "one") { "One" }
+      tabs.with_panel(tab_id: "two") { "Two" }
+    end
+
+    assert_selector "button[role='tab'].whitespace-nowrap", count: 2
+  end
 end

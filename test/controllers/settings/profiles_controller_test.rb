@@ -78,6 +78,23 @@ class Settings::ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert User.find(@member.id), "user row must be preserved so historical access can be restored"
   end
 
+  test "admin removes a joined member without destroying the user" do
+    other_family = families(:empty)
+    FamilyMembership.create!(user: @admin, family: other_family, role: "owner")
+    membership = FamilyMembership.create!(user: @member, family: other_family, role: "viewer")
+    sign_in @admin
+    post switch_family_path(family_id: other_family.id)
+
+    assert_no_difference("User.count") do
+      delete settings_profile_path(user_id: @member)
+    end
+
+    assert_redirected_to settings_profile_path
+    assert_equal I18n.t("settings.profiles.destroy.member_removed"), flash[:notice]
+    assert_not FamilyMembership.exists?(membership.id)
+    assert User.exists?(@member.id)
+  end
+
   test "admin removing a family member also destroys their invitation" do
     # Create an invitation for the member
     invitation = @admin.family.invitations.create!(

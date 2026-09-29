@@ -1,0 +1,20 @@
+<%= render DS::Dialog.new do |dialog| %>
+  <% dialog.with_header(title: t(".title"), subtitle: t(".subtitle", moniker: family_moniker_downcase)) %>
+
+  <% dialog.with_body do %>
+    <%= styled_form_with model: @family, class: "space-y-4", data: { turbo: false } do |form| %>
+      <%= form.text_field :name,
+        required: true,
+        placeholder: t(".name_placeholder"),
+        label: t(".name_label") %>
+
+      <%= form.select :currency,
+        currency_picker_options_for_family.map { |code| [ currency_label(code), code ] },
+        { label: t(".currency_label"), required: true, selected: @family.currency } %>
+
+      <div class="w-full">
+        <%= form.submit t(".submit"), class: "bg-inverse text-inverse rounded-lg px-4 py-2 w-full" %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

@@ -13,7 +13,7 @@
 | 1. FamilyMembership 数据模型 | 已完成 |
 | 2. session 存当前账本 + 切换器 | 已完成 |
 | 3. 权限收紧 | 进行中：模型层已完成，但控制器和 AI 助手仍按主账本取数（见"第二轮评审"） |
-| 4. 产品流程（创建账本、邀请、角色矩阵） | 进行中（5a 账本感知角色判定已完成） |
+| 4. 产品流程（创建账本、邀请、角色矩阵） | 进行中（5a 账本感知角色判定、5b 邀请加入语义已完成） |
 | 5. 全量测试 + Docker 部署 | 未开始 |
 | 6. 拆上游 PR | 未开始 |
 
@@ -227,7 +227,7 @@
 - [ ] **只能用主账本的入口。** API、MCP（`app/controllers/mcp_controller.rb:169`）和 API key 导出（`app/controllers/reports_controller.rb:1144`）都新建 session，所以固定用主账本。推送通知可能来自账本 B 的洞察，但移动端通过 API 打开时找不到这条洞察。之前已列入延后，这里补充 MCP、导出和推送三个具体入口。
 - [x] **成员页删除用户不走 purge。** `Settings::ProfilesController#destroy` 直接调用 `@user.destroy`，不会执行 `destroy_sole_member_secondary_ledgers!`，被删用户独占的非主账本会成为孤儿。后台删除（`permanently_remove!` → `purge_later`）没有这个问题。
 - [x] **语言和时区跟随账本。** `Localize` 在用户没设语言时退回 `Current.family.locale`，时区也取当前账本的。两个账本设置不同时，切换账本会改变界面语言和日期边界。需要确认这是否符合预期；如果不是，界面语言应以用户设置为准。
-- [ ] **邀请仍是"移动"语义**（已计划为 5b）。在它完成之前，产品里仍然没有路径能让一个人同时属于两个账本。
+- [x] **邀请仍是"移动"语义**（5b，2026-09-29 完成，见文末处理记录）。
 
 ### 工作区未提交改动（角色事实源、super_admin）的评审
 
@@ -282,7 +282,7 @@
 
 - [ ] 跨账本链接 404 时提示或自动切换。
 - [ ] API、MCP、API key 导出、推送打开只能用主账本（和 5c 一起做）。
-- [ ] 邀请的"加入"语义（5b）。
+- [x] 邀请的"加入"语义（5b，见文末处理记录）。
 - [ ] 默认账户按账本存。
 
 验证：
@@ -291,3 +291,17 @@
 - rubocop（32 个改动文件）、erb_lint、brakeman 都没有问题。
 - Biome：本地没有安装 `node_modules`，没有运行。
 - 请求头的前端逻辑没有在浏览器里实测：按仓库约定不启动 `rails server`。服务端的拦截已由集成测试覆盖。
+
+## 第四轮处理记录（2026-09-29）：邀请"加入"语义（5b）
+
+用户反馈：邀请一个已有自己账本（且有账户）的用户时报"此用户已有家庭数据，无法接受该邀请"。改为加入语义后，这是多账本的主产品路径。
+
+改动：
+
+- `Invitation#accept_for`（`app/models/invitation.rb`）：不再改 `users.family_id`。统一走 `family_memberships.find_or_initialize_by(family_id:)`，按邀请角色建/更新 membership。已有主账本的用户加入新账本，主账本、名下账户、provider item 所有权都不动。邀请对象是主账本成员时，更新 membership 角色仍会经 `project_role_onto_user` 投影回 `users.role`（原有行为保持）。
+- 邀请角色映射：member→editor，guest→viewer，admin→admin（不是 owner；`role_for_legacy_role` 的 admin→owner 只适用于主账本回填）。角色矩阵（5e）再定最终方案。
+- 删除 `would_orphan_owned_accounts?` 和 `release_provider_item_ownership`：加入语义下没有"搬走"，不存在孤儿账户/孤儿 provider item。
+- 删除"邮箱在另一个账本有 pending 邀请"的校验（`no_other_pending_invitation`）：多账本下一个人可以同时收到多份邀请。库内 partial unique index（email+family_id pending）保留，`remove_expired_duplicates_in_family` 不动。
+- `InvitationsController#create`：去掉 `existing_user_has_family_data` 分支；15 个 locale 文件删除该 key。
+- 注意：`users.family_id` 是 NOT NULL，持久化用户一定有主账本，所以 accept_for 不可能收到"无账本"用户（新用户走 registrations/SSO，它们直接指定邀请的账本）。删掉了相关死分支。
+- 测试：模型 + 控制器测试改为断言加入语义；新增"名下有账户的用户也能被邀请加入"的回归测试。

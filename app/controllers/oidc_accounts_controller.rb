@@ -68,7 +68,7 @@ class OidcAccountsController < ApplicationController
         session[:mfa_user_id] = user.id
         redirect_to verify_mfa_path
       else
-        notice = if accept_pending_invitation_for(user)
+        notice = if accept_pending_invitation_for(user, @session)
           t("invitations.accept_choice.joined_household")
         else
           t("sessions.openid_connect.account_linked", provider: @pending_auth["provider"])
@@ -204,7 +204,7 @@ class OidcAccountsController < ApplicationController
 
       notice = if invitation.present?
         t("invitations.accept_choice.joined_household")
-      elsif accept_pending_invitation_for(@user)
+      elsif accept_pending_invitation_for(@user, @session)
         t("invitations.accept_choice.joined_household")
       else
         t(".account_created")

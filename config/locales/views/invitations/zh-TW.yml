@@ -9,7 +9,6 @@ zh-TW:
       title: 加入 %{family}
     create:
       existing_user_added: 使用者已加入您的家庭。
-      existing_user_has_family_data: 這位使用者已經擁有自己的家庭，且該家庭底下有帳戶。對方必須先移除或轉移那些帳戶，才能加入您的家庭。
       failure: 傳送邀請失敗
       success: 邀請傳送成功
     destroy:

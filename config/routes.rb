@@ -346,6 +346,11 @@ Rails.application.routes.draw do
     post :switch
   end
 
+  # Creating an additional ledger for the current user. The creator becomes its
+  # owner and the session switches to it, so the new ledger is immediately
+  # usable.
+  resources :families, only: %i[new create]
+
   resource :registration, only: %i[new create]
   resources :sessions, only: %i[index new create destroy]
   # Passwordless sign-in with a discoverable passkey. Unauthenticated by design;

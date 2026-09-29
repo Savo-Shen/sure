@@ -9,7 +9,6 @@ tr:
       title: "%{family} hanesine katıl"
     create:
       existing_user_added: Kullanıcı hanenize eklendi.
-      existing_user_has_family_data: Bu kullanıcının zaten hesapları olan bir hanesi
         var. Sizinkine katılmadan önce bu hesapları kaldırması veya devretmesi gerekiyor.
       failure: Davetiye gönderilemedi
       success: Davetiye başarıyla gönderildi

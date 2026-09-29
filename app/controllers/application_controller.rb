@@ -27,7 +27,10 @@ class ApplicationController < ActionController::Base
   helper_method :demo_config, :demo_host_match?, :show_demo_warning?, :current_sidekiq_health
 
   private
-    def accept_pending_invitation_for(user)
+    # `session_record` is the session just created for `user`: joining a ledger is
+    # not moving, so the user's primary ledger is untouched and only the new
+    # session can point at the ledger they just joined.
+    def accept_pending_invitation_for(user, session_record)
       return false if user.blank?
 
       token = session[:pending_invitation_token]
@@ -38,6 +41,7 @@ class ApplicationController < ActionController::Base
       return false unless invitation.accept_for(user)
 
       session.delete(:pending_invitation_token)
+      session_record&.switch_active_family!(invitation.family)
       true
     end
 

@@ -85,7 +85,7 @@ class SessionsController < ApplicationController
         @session = create_session_for(user)
 
         if @session
-          flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user)
+          flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user, @session)
           redirect_to root_path
         else
           redirect_to new_session_path, alert: t("sessions.create.account_deactivated")
@@ -236,7 +236,7 @@ class SessionsController < ApplicationController
         redirect_to new_session_path, alert: t("sessions.openid_connect.failed")
         return
       end
-      flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user)
+      flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user, @session)
       redirect_to root_path
     end
   end
@@ -319,7 +319,7 @@ class SessionsController < ApplicationController
           redirect_to new_session_path, alert: t("sessions.openid_connect.failed")
           return
         end
-        flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user)
+        flash[:notice] = t("invitations.accept_choice.joined_household") if accept_pending_invitation_for(user, @session)
         redirect_to root_path
       end
     else

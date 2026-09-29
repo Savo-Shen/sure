@@ -174,6 +174,23 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "signing in through an invitation link joins that ledger and lands on it" do
+    invitee = users(:empty)
+    primary_ledger = invitee.family
+    invitation = @user.family.invitations.create!(email: invitee.email, role: "member", inviter: @user)
+
+    get new_session_url(invitation: invitation.token)
+    assert_difference -> { invitee.sessions.count }, 1 do
+      post sessions_url, params: { email: invitee.email, password: user_password_test }
+    end
+
+    assert_redirected_to root_url
+    invitee.reload
+    assert_equal primary_ledger.id, invitee.family_id, "joining must not move the invitee's primary ledger"
+    assert_equal "editor", invitee.role_in(@user.family)
+    assert_equal @user.family.id, invitee.sessions.order(:created_at).last.active_family_id
+  end
+
   test "does not issue a session when user is deleted before row locking" do
     @user.stubs(:with_lock).raises(ActiveRecord::RecordNotFound)
     User.stubs(:authenticate_by).returns(@user)

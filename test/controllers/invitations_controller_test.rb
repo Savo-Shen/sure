@@ -53,10 +53,32 @@ class InvitationsControllerTest < ActionDispatch::IntegrationTest
     invitation = Invitation.order(created_at: :desc).first
     assert invitation.accepted_at.present?, "Invitation should be accepted"
     existing_user.reload
-    assert_equal @admin.family_id, existing_user.family_id
-    assert_equal "member", existing_user.role
+    assert_equal families(:empty).id, existing_user.family_id, "joining must not move the user's primary ledger"
+    assert_equal "editor", existing_user.role_in(@admin.family)
     assert_redirected_to settings_profile_path
     assert_equal I18n.t("invitations.create.existing_user_added"), flash[:notice]
+  end
+
+  test "inviting an existing user who owns accounts in their own ledger succeeds" do
+    existing_user = users(:empty)
+    account = existing_user.family.accounts.create!(
+      name: "Prior savings", balance: 100, currency: "USD",
+      accountable: Depository.new
+    )
+    account.update_columns(owner_id: existing_user.id)
+
+    post invitations_url, params: {
+      invitation: {
+        email: existing_user.email,
+        role: "member"
+      }
+    }
+
+    assert_redirected_to settings_profile_path
+    assert_equal I18n.t("invitations.create.existing_user_added"), flash[:notice]
+    existing_user.reload
+    assert_equal "editor", existing_user.role_in(@admin.family)
+    assert_equal existing_user.id, account.reload.owner_id, "owned accounts must stay with their owner"
   end
 
   test "non-admin cannot create invitations" do
@@ -107,7 +129,7 @@ class InvitationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @admin, invitation.inviter
   end
 
-  test "inviting an existing user as guest applies intro defaults" do
+  test "inviting an existing user as guest joins without touching their primary ledger" do
     existing_user = users(:empty)
     existing_user.update!(
       role: :member,
@@ -127,11 +149,9 @@ class InvitationsControllerTest < ActionDispatch::IntegrationTest
     end
 
     existing_user.reload
-    assert_equal "guest", existing_user.role
-    assert existing_user.ui_layout_intro?
-    assert_not existing_user.show_sidebar?
-    assert_not existing_user.show_ai_sidebar?
-    assert existing_user.ai_enabled?
+    assert_equal "member", existing_user.role, "guest invitation must not change the user's primary role"
+    assert existing_user.ui_layout_dashboard?
+    assert_equal "viewer", existing_user.role_in(@admin.family)
   end
 
   test "re-inviting an email whose prior invitation expired succeeds instead of 500ing" do

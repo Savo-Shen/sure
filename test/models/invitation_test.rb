@@ -7,7 +7,7 @@ class InvitationTest < ActiveSupport::TestCase
     @inviter = @invitation.inviter
   end
 
-  test "accept_for adds user to family when email matches" do
+  test "accept_for joins user with their own ledger without moving them" do
     user = users(:empty)
     user.update_columns(family_id: families(:empty).id, role: "admin")
     assert user.family_id != @family.id
@@ -18,8 +18,9 @@ class InvitationTest < ActiveSupport::TestCase
 
     assert result
     user.reload
-    assert_equal @family.id, user.family_id
-    assert_equal "member", user.role
+    assert_equal families(:empty).id, user.family_id, "joining must keep the user's primary ledger"
+    assert_equal "admin", user.role
+    assert_equal "editor", user.role_in(@family)
     invitation.reload
     assert invitation.accepted_at.present?
   end
@@ -62,50 +63,15 @@ class InvitationTest < ActiveSupport::TestCase
     assert_not result
   end
 
-  test "cannot create invitation when email has pending invitation from another family" do
+  test "can create invitation when email has pending invitation from another family" do
     other_family = families(:empty)
     other_inviter = users(:empty)
     other_inviter.update_columns(family_id: other_family.id, role: "admin")
 
     email = "cross-family-test@example.com"
 
-    # Create a pending invitation in the first family
     @family.invitations.create!(email: email, role: "member", inviter: @inviter)
 
-    # Attempting to create a pending invitation in a different family should fail
-    invitation = other_family.invitations.build(email: email, role: "member", inviter: other_inviter)
-    assert_not invitation.valid?
-    assert_includes invitation.errors[:email], "already has a pending invitation from another family"
-  end
-
-  test "can create invitation when existing invitation from another family is accepted" do
-    other_family = families(:empty)
-    other_inviter = users(:empty)
-    other_inviter.update_columns(family_id: other_family.id, role: "admin")
-
-    email = "cross-family-accepted@example.com"
-
-    # Create an accepted invitation in the first family
-    accepted_invitation = @family.invitations.create!(email: email, role: "member", inviter: @inviter)
-    accepted_invitation.update!(accepted_at: Time.current)
-
-    # Should be able to create a pending invitation in a different family
-    invitation = other_family.invitations.build(email: email, role: "member", inviter: other_inviter)
-    assert invitation.valid?
-  end
-
-  test "can create invitation when existing invitation from another family is expired" do
-    other_family = families(:empty)
-    other_inviter = users(:empty)
-    other_inviter.update_columns(family_id: other_family.id, role: "admin")
-
-    email = "cross-family-expired@example.com"
-
-    # Create an expired invitation in the first family
-    expired_invitation = @family.invitations.create!(email: email, role: "member", inviter: @inviter)
-    expired_invitation.update_columns(expires_at: 1.day.ago)
-
-    # Should be able to create a pending invitation in a different family
     invitation = other_family.invitations.build(email: email, role: "member", inviter: other_inviter)
     assert invitation.valid?
   end
@@ -148,7 +114,7 @@ class InvitationTest < ActiveSupport::TestCase
     assert_includes invitation.errors[:email], "has already been invited to this family"
   end
 
-  test "accept_for refuses when invitee owns accounts that would be orphaned" do
+  test "accept_for joins a user who owns accounts in their own ledger" do
     owner = users(:empty)
     owner_family = families(:empty)
     owner.update_columns(family_id: owner_family.id, role: "admin")
@@ -162,49 +128,14 @@ class InvitationTest < ActiveSupport::TestCase
 
     result = invitation.accept_for(owner)
 
-    assert_not result, "accept_for must refuse to rehome a user away from accounts they own"
+    assert result, "owning accounts must not block joining another ledger"
     owner.reload
-    assert_equal owner_family.id, owner.family_id, "user.family_id must not be silently overwritten"
-    invitation.reload
-    assert_nil invitation.accepted_at, "invitation must remain pending so a new flow can recover"
+    assert_equal owner_family.id, owner.family_id, "joining must keep the user's primary ledger"
+    assert_equal "editor", owner.role_in(@family)
+    assert_equal owner.id, account.reload.owner_id, "owned accounts must stay with their owner"
     assert owner_family.accounts.exists?, "original family's accounts must remain intact"
-  end
-
-  test "accept_for allows a member who owns no accounts to join another family" do
-    member = users(:empty)
-    other_owner = users(:sure_support_staff)
-    source_family = families(:empty)
-    member.update_columns(family_id: source_family.id, role: "member")
-    other_owner.update_columns(family_id: source_family.id, role: "admin")
-    account = source_family.accounts.create!(
-      name: "Shared savings", balance: 100, currency: "USD",
-      accountable: Depository.new
-    )
-    account.update_columns(owner_id: other_owner.id)
-
-    invitation = @family.invitations.create!(email: member.email, role: "member", inviter: @inviter)
-
-    result = invitation.accept_for(member)
-
-    assert result, "a non-owner member must be free to join another family"
-    member.reload
-    assert_equal @family.id, member.family_id
-  end
-
-  test "would_orphan_owned_accounts? is false when invitee owns no accounts" do
-    user = users(:empty)
-    user.update_columns(family_id: families(:empty).id, role: "admin")
-    invitation = @family.invitations.create!(email: user.email, role: "member", inviter: @inviter)
-
-    assert_not invitation.would_orphan_owned_accounts?(user)
-  end
-
-  test "would_orphan_owned_accounts? is false when same-family role change" do
-    user = users(:family_member)
-    user.update!(family_id: @family.id, role: "member")
-    invitation = @family.invitations.create!(email: user.email, role: "admin", inviter: @inviter)
-
-    assert_not invitation.would_orphan_owned_accounts?(user)
+    invitation.reload
+    assert invitation.accepted_at.present?
   end
 
   test "accept_for applies guest role defaults" do
@@ -257,7 +188,8 @@ class InvitationTest < ActiveSupport::TestCase
 
     user.reload
     shares = AccountShare.where(user: user)
-    assert_equal "guest", user.role
+    assert_equal "viewer", user.role_in(@family)
+    assert_equal "admin", user.role, "guest invitation must not demote the user's primary role"
     assert_equal expected_ids, shares.pluck(:account_id).sort
     assert shares.all?(&:read_only?), "guest invitation shares must grant read_only"
   end
@@ -273,15 +205,12 @@ class InvitationTest < ActiveSupport::TestCase
     end
   end
 
-  test "accepting an invitation releases provider items left behind" do
-    # The item's owner is leaving the family but the item stays. Without
-    # releasing it, the orphaned owner fails ProviderItemOwnable's same-family
-    # validation on the next save and the connection becomes unsyncable.
+  test "accepting as an additional ledger keeps provider items owned" do
     user = users(:family_member)
     old_family = user.family
     item = PlaidItem.create!(
       family: old_family, plaid_id: "item_invite_#{SecureRandom.hex(4)}",
-      access_token: "token", name: "Left Behind Bank", owner: user
+      access_token: "token", name: "My Bank", owner: user
     )
     new_family = Family.create!(name: "Invited Family")
     invitation = Invitation.create!(
@@ -291,8 +220,8 @@ class InvitationTest < ActiveSupport::TestCase
 
     assert invitation.accept_for(user)
 
-    assert_nil item.reload.owner_id
+    assert_equal user.id, item.reload.owner_id, "joining must not strip item ownership"
     assert_equal old_family, item.family
-    assert item.valid?, "the left-behind item must still be savable"
+    assert_equal "editor", user.role_in(new_family)
   end
 end

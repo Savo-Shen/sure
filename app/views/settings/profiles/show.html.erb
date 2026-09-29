@@ -53,7 +53,7 @@
             </div>
             <p class="text-primary font-medium text-sm"><%= user.display_name %></p>
             <%= render DS::Pill.new(label: t("users.roles.#{membership.legacy_role}", default: membership.legacy_role.humanize), tone: :gray, marker: false, size: :sm) %>
-            <% if Current.user.admin? && user != Current.user && membership.primary? %>
+            <% if Current.user.admin? && user != Current.user %>
               <div class="ml-auto">
                 <%= render DS::Button.new(
                   variant: "icon",

@@ -63,10 +63,9 @@
       <%= render DS::MenuItem.new(variant: "link", roving: false, text: t(".contact"), icon: "message-square-more", href: "https://discord.gg/36ZGBsxYEK", target: "_blank", rel: "noopener noreferrer") %>
 
       <%# Intro layout has no account sidebar, so the ledger switcher lives here. %>
-      <% ledgers = intro_mode ? user.families.order(:name).to_a : [] %>
-      <% if ledgers.size > 1 %>
+      <% if intro_mode %>
         <%= render DS::MenuItem.new(variant: "divider") %>
-        <% ledgers.each do |ledger| %>
+        <% user.families.order(:name).each do |ledger| %>
           <%= render DS::MenuItem.new(
             variant: "button",
             roving: false,
@@ -76,6 +75,14 @@
             selected: ledger == Current.family
           ) %>
         <% end %>
+        <%= render DS::MenuItem.new(
+          variant: "link",
+          roving: false,
+          text: t("families.switcher.new_ledger"),
+          icon: "plus",
+          href: new_family_path,
+          data: { turbo_frame: :modal }
+        ) %>
       <% end %>
 
       <%= render DS::MenuItem.new(variant: "divider") %>

@@ -4,6 +4,16 @@ en:
     switcher:
       switch_ledger: Switch ledger
       unnamed_ledger: Unnamed ledger
+      new_ledger: New ledger
     switch:
       switched: "Now viewing %{family}"
       not_a_member: You don't have access to that ledger
+    new:
+      title: New ledger
+      subtitle: "An empty %{moniker} with its own accounts, transactions and members. You'll be its owner."
+      name_label: Ledger name
+      name_placeholder: e.g. Household, Business
+      currency_label: Currency
+      submit: Create ledger
+    create:
+      created: "%{family} created"

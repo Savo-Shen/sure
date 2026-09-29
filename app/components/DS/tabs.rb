@@ -42,7 +42,11 @@ class DS::Tabs < DesignSystemComponent
       # last raw-palette reference in DS::Tabs.
       active_btn_classes: "tab-item-active text-primary shadow-sm",
       inactive_btn_classes: "text-secondary hover:bg-surface-inset-hover",
-      base_btn_classes: "w-full inline-flex justify-center items-center text-sm font-medium px-2 py-1 rounded-md motion-safe:transition-colors motion-safe:duration-200",
+      # `whitespace-nowrap`: tab labels must never wrap. CJK labels wrap
+      # per-character, and in hug-content navs (`max-w-fit`) the `w-full`
+      # buttons would otherwise shrink to equal shares narrower than the
+      # longest label (matches `.segmented-control__segment`).
+      base_btn_classes: "w-full inline-flex justify-center items-center whitespace-nowrap text-sm font-medium px-2 py-1 rounded-md motion-safe:transition-colors motion-safe:duration-200",
       nav_container_classes: "flex bg-surface-inset p-1 rounded-lg mb-4"
     }
   }
