@@ -127,8 +127,14 @@ bin/rails test
 即使本机是 Apple Silicon，也通过 Docker Buildx 交叉构建 Linux amd64 镜像：
 
 ```sh
+colima start
+trap 'colima stop' EXIT
 bin/build_gzip.sh
 ```
+
+本机使用 Colima 提供 Docker daemon。构建和后续部署完成后，`trap` 会自动执行
+`colima stop` 关闭 Colima；如果只需要构建，也请保留这两行，避免后台长期运行
+Docker daemon。
 
 脚本会根据当前 Git commit 生成镜像和压缩包，例如：
 
