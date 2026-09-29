@@ -123,38 +123,45 @@ bin/rails test
 
 ### 2. 本地编译/构建
 
-默认 Dockerfile 生成生产镜像。构建时传入提交标识，便于在生产菜单和日志中确认版本：
+生产镜像统一在本地构建，不在服务器上执行 Ruby、gem、系统依赖或前端资源编译。
+即使本机是 Apple Silicon，也通过 Docker Buildx 交叉构建 Linux amd64 镜像：
 
 ```sh
-docker build --platform linux/amd64 \
-  --build-arg BUILD_COMMIT_SHA="$(git rev-parse --short HEAD)" \
-  -t sure:savo-ledger-$(git rev-parse --short HEAD) .
+bin/build_gzip.sh
 ```
 
-如果本机 Docker 不是 amd64，使用服务器 Docker daemon 构建：
+脚本会根据当前 Git commit 生成镜像和压缩包，例如：
 
-```sh
-DOCKER_HOST=ssh://savo-prod docker build --network host --pull=false \
-  --platform linux/amd64 \
-  --build-arg BUILD_COMMIT_SHA="$(git rev-parse --short HEAD)" \
-  -t sure:savo-ledger-$(git rev-parse --short HEAD) .
+```text
+savo-ledger:savo-ledger-95ae908
+savo-ledger-95ae908.tar.gz
 ```
 
-### 3. 部署到 savo-prod
+压缩包是本地部署产物，不提交到 Git。构建前需要 Docker Desktop/Buildx 可用。
+
+### 3. 上传并部署到 savo-prod
 
 生产目录是 `/opt/savo-ledger`，Compose 服务包括 `web`、`worker`、`db` 和 `redis`。
 PostgreSQL 与 Redis 由该 Compose 项目复用，不要重复创建基础设施或直接覆盖数据库卷。
 
 ```sh
-ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose config --quiet'
-ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d web worker'
-ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose ps'
+bin/upload_gzip.sh --reload
 ```
 
-使用远程构建镜像时，更新 `/opt/savo-ledger/.env` 中的镜像标签后再重建 Web/Worker：
+上传脚本会通过 `rsync` 把镜像包传到服务器，执行 `docker load`，备份服务器上的
+`compose.yml`，更新 web/worker 的镜像标签，并只重建这两个应用服务。数据库和
+Redis 服务不会被重建，也不会自动执行迁移。
+
+只上传、不重启可以运行：
 
 ```sh
-ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d --force-recreate web worker'
+bin/upload_gzip.sh
+```
+
+如需使用其他 SSH 主机或生产目录：
+
+```sh
+REMOTE=savo-prod DEST=/opt/savo-ledger bin/upload_gzip.sh --reload
 ```
 
 不要在生产环境执行 `rails server`、手工修改数据库或自动运行迁移；需要迁移时先
@@ -178,7 +185,7 @@ ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose logs --tail 200 web wo
 
 部署前保留数据库和旧应用数据备份。当前服务器上的 Actual 原始数据、迁移副本和
 压缩备份位于 `/opt/lab-finance/` 及相关备份目录，除非确认迁移完成，否则不要删除。
-回滚时恢复上一镜像标签和 Compose 配置，再执行：
+回滚时恢复服务器上对应的 `compose.yml.before-<commit>` 备份，再执行：
 
 ```sh
 ssh savo-prod 'cd /opt/savo-ledger && sudo docker compose up -d --force-recreate web worker'
