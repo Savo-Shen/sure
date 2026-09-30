@@ -3,8 +3,10 @@ class Api::V1::CashFlowsController < Api::V1::BaseController
 
   def show
     response.headers["Cache-Control"] = "private, no-store"
-    today = Date.current
-    statement = IncomeStatement.new(current_resource_owner.family, user: current_resource_owner)
+    family = current_resource_owner.family
+    today = Time.use_zone(family.timezone) { Date.current }
+    time_zone = ActiveSupport::TimeZone[family.timezone]&.tzinfo&.identifier || Time.zone.tzinfo.identifier
+    statement = IncomeStatement.new(family, user: current_resource_owner)
     if params[:include] && params[:view]
       return invalid_query("invalid_view", "include and view cannot be combined")
     end
@@ -27,9 +29,10 @@ class Api::V1::CashFlowsController < Api::V1::BaseController
 
     if params[:view] == "sankey"
       # Arbitrary graph ranges must not allocate a daily comparison series.
-      render json: IncomeStatement::CashFlowGraph.new(statement, period: period, as_of: today)
+      render json: IncomeStatement::CashFlowGraph.new(statement, period: period, as_of: today, time_zone: time_zone)
     else
-      render json: IncomeStatement::CashFlow.new(statement, month: month, as_of: today, include_sankey: params[:include] == "sankey")
+      render json: IncomeStatement::CashFlow.new(statement, month: month, as_of: today, time_zone: time_zone,
+        include_sankey: params[:include] == "sankey")
     end
   end
 
