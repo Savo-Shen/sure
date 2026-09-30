@@ -164,6 +164,7 @@ class Transactions::TagSummaryViewTest < ActionView::TestCase
   private
     def sign_in_as_family_member
       @user = users(:family_member)
+      Current.reset
       Current.session = Session.create!(user: @user)
       @accessible_account_ids = @user.accessible_accounts.pluck(:id).to_set
     end

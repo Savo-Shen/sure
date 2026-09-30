@@ -47,7 +47,9 @@ module Notifiable
       when "cta"
         [ resolve_cta(data) ]
       when "notice"
-        Array(data).map do |notice|
+        notices = data.is_a?(Hash) ? [ data ] : Array(data)
+
+        notices.map do |notice|
           if notice.is_a?(Hash)
             message = notice.fetch(:message) { notice.fetch("message") }
             description = notice[:description] || notice["description"]

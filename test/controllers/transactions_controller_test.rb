@@ -115,6 +115,9 @@ class TransactionsControllerTest < ActionDispatch::IntegrationTest
       flash[:notice]
     )
     assert_enqueued_with(job: SyncJob)
+
+    follow_redirect!
+    assert_select "#notification-tray", /Your balance is updating and will refresh automatically\./
   end
 
   test "resubmitting the same idempotency key does not create a duplicate transaction" do
